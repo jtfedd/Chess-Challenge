@@ -64,19 +64,21 @@ namespace ChessChallenge.BotMatch
             Console.WriteLine();
 
             int barSize = 50;
+            char barChar = '#';
             Console.ForegroundColor = ConsoleColor.Green;
-            for (int i = 0; i < winPct * barSize; i++) Console.Write("-");
+            for (int i = 0; i < winPct * barSize; i++) Console.Write(barChar);
 
             Console.ForegroundColor = ConsoleColor.Gray;
-            for (int i = 0; i < drawPct * barSize; i++) Console.Write("-");
+            for (int i = 0; i < drawPct * barSize; i++) Console.Write(barChar);
 
             Console.ForegroundColor = ConsoleColor.Red;
-            for (int i = 0; i < lossPct * barSize; i++) Console.Write("-");
+            for (int i = 0; i < lossPct * barSize; i++) Console.Write(barChar);
 
             Console.WriteLine();
 
-            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.ForegroundColor = NumTimeouts > 0 ? ConsoleColor.Red : ConsoleColor.Gray;
             Console.WriteLine($"Timeouts: {NumTimeouts}");
+            Console.ForegroundColor = NumTimeouts > 0 ? ConsoleColor.Red : ConsoleColor.Gray;
             Console.WriteLine($"Illegal Moves: {NumIllegalMoves}");
             Console.ResetColor();
         }
