@@ -1,10 +1,4 @@
-﻿using Raylib_cs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static ChessChallenge.Application.ConsoleHelper;
+﻿using ChessChallenge.BotMatch;
 
 
 namespace ChessChallenge.Application
@@ -13,12 +7,8 @@ namespace ChessChallenge.Application
     {
         public static void BotMatchMain()
         {
-            MatchController controller = new();
-
-            while(controller.MatchInProgress)
-            {
-                controller.Update();
-            }
+            MatchRunner runner = new(MatchRunner.PlayerType.MyBot, MatchRunner.PlayerType.EvilBot, 60 * 1000);
+            runner.Run();
         }
     }
 }

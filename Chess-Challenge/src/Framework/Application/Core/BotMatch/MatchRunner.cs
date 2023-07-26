@@ -1,21 +1,28 @@
 ﻿using ChessChallenge.Chess;
 using ChessChallenge.Example;
 using System;
-using System.IO;
 using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using static ChessChallenge.Application.Settings;
-using static ChessChallenge.Application.ConsoleHelper;
+using api = ChessChallenge.API;
+using ChessChallenge.Application;
 
-namespace ChessChallenge.Application
+
+namespace ChessChallenge.BotMatch
 {
-    public class MatchController
+    public class MatchRunner
     {
-        ChallengeController.PlayerType PlayerAType = ChallengeController.PlayerType.MyBot;
-        ChallengeController.PlayerType PlayerBType = ChallengeController.PlayerType.EvilBot;
+        PlayerType PlayerAType;
+        PlayerType PlayerBType;
+        int playerTime;
+
+        public enum PlayerType
+        {
+            MyBot,
+            EvilBot,
+        }
 
         // Game state
         Random rng;
@@ -25,11 +32,9 @@ namespace ChessChallenge.Application
         public ChessPlayer PlayerWhite { get; private set; }
         public ChessPlayer PlayerBlack { get; private set; }
 
-        double lastMoveMadeTime;
         bool isWaitingToPlayMove;
         double lastUpdateTime;
         Move moveToPlay;
-        double playMoveTime;
         public bool HumanWasWhiteLastGame { get; private set; }
 
         // Bot match state
@@ -56,15 +61,22 @@ namespace ChessChallenge.Application
 
         public bool MatchInProgress;
 
+        static string GetPlayerName(ChessPlayer player) => player.PlayerType.ToString();
+        static string GetPlayerName(PlayerType type) => type.ToString();
+
         double getTime()
         {
             return DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
         }
 
-        public MatchController()
+        public MatchRunner(PlayerType playerAType, PlayerType playerBType, int playerTimeMs)
         {
-            Log($"Launching Bot Match version {Settings.Version}");
+            Console.WriteLine($"Launching Bot Match version {Settings.Version}");
             Warmer.Warm();
+
+            PlayerAType = playerAType;
+            PlayerBType = playerBType;
+            this.playerTime = playerTimeMs;
 
             rng = new Random();
             moveGenerator = new();
@@ -81,13 +93,34 @@ namespace ChessChallenge.Application
             StartNewGame(PlayerAType, PlayerBType);
         }
 
-        public void StartNewGame(ChallengeController.PlayerType whiteType, ChallengeController.PlayerType blackType)
+        public void Run()
+        {
+            while(MatchInProgress)
+            {
+                Update();
+            }
+        }
+
+        ChessPlayer CreatePlayer(PlayerType type)
+        {
+            return type switch
+            {
+                PlayerType.MyBot => MakeBot(new MyBot()),
+                PlayerType.EvilBot => MakeBot(new EvilBot()),
+            };
+        }
+
+        ChessPlayer MakeBot(api::IChessBot bot)
+        {
+            return new ChessPlayer(bot, ChallengeController.PlayerType.MyBot, playerTime);
+        }
+
+        void StartNewGame(PlayerType whiteType, PlayerType blackType)
         {
             // End any ongoing game
             EndGame(GameResult.DrawByArbiter, autoStartNextBotMatch: false);
             gameID = rng.Next();
 
-            lastMoveMadeTime = getTime();
             lastUpdateTime = getTime();
 
             // Stop prev task and create a new one
@@ -109,15 +142,6 @@ namespace ChessChallenge.Application
             // Start
             isPlaying = true;
             NotifyTurnToMove();
-        }
-
-        ChessPlayer CreatePlayer(ChallengeController.PlayerType type)
-        {
-            return type switch
-            {
-                ChallengeController.PlayerType.MyBot => new ChessPlayer(new MyBot(), type, GameDurationMilliseconds),
-                ChallengeController.PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
-            };
         }
 
         void NotifyTurnToMove()
@@ -164,7 +188,9 @@ namespace ChessChallenge.Application
             }
             catch (Exception e)
             {
-                Log("An error occurred while bot was thinking.\n" + e.ToString(), true, ConsoleColor.Red);
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("An error occurred while bot was thinking.\n" + e.ToString());
+                Console.ResetColor();
                 hasBotTaskException = true;
                 botExInfo = ExceptionDispatchInfo.Capture(e);
             }
@@ -181,8 +207,9 @@ namespace ChessChallenge.Application
             else
             {
                 string moveName = MoveUtility.GetMoveNameUCI(chosenMove);
-                string log = $"Illegal move: {moveName} in position: {FenUtility.CurrentFen(board)}";
-                Log(log, true, ConsoleColor.Red);
+                Console.ForegroundColor= ConsoleColor.Red;
+                Console.WriteLine($"Illegal move: {moveName} in position: {FenUtility.CurrentFen(board)}");
+                Console.ResetColor();
                 GameResult result = PlayerToMove == PlayerWhite ? GameResult.WhiteIllegalMove : GameResult.BlackIllegalMove;
                 EndGame(result);
             }
@@ -191,8 +218,6 @@ namespace ChessChallenge.Application
         void PlayMove(Move move)
         {
             if (!isPlaying) return;
-
-            lastMoveMadeTime = getTime();
 
             board.MakeMove(move, false);
 
@@ -223,7 +248,7 @@ namespace ChessChallenge.Application
             BotStatsB.UpdateStats(result, !botAPlaysWhite);
             botMatchGameIndex++;
 
-            Log($"({botMatchGameIndex}/{TotalGameCount}) [+{BotStatsA.NumWins} ={BotStatsA.NumDraws} -{BotStatsA.NumLosses}] Game Over: " + result, false, ConsoleColor.Blue);
+            Console.WriteLine($"({botMatchGameIndex}/{TotalGameCount}) [+{BotStatsA.NumWins} ={BotStatsA.NumDraws} -{BotStatsA.NumLosses}] Game Over: " + result);
 
             if (botMatchGameIndex < TotalGameCount && autoStartNextBotMatch)
             {
@@ -233,7 +258,7 @@ namespace ChessChallenge.Application
             }
             else if (autoStartNextBotMatch)
             {
-                Log("Match finished", false, ConsoleColor.Blue);
+                Console.WriteLine("Match finished");
                 BotStatsA.Print();
                 BotStatsB.Print();
                 MatchInProgress = false;
@@ -244,7 +269,7 @@ namespace ChessChallenge.Application
         {
             if (originalGameID == gameID)
             {
-                StartNewGame(PlayerBlack.PlayerType, PlayerWhite.PlayerType);
+                StartNewGame(botAPlaysWhite ? PlayerAType : PlayerBType, botAPlaysWhite ? PlayerBType : PlayerAType);
             }
         }
 
@@ -277,15 +302,12 @@ namespace ChessChallenge.Application
             }
         }
 
-        static string GetPlayerName(ChessPlayer player) => GetPlayerName(player.PlayerType);
-        static string GetPlayerName(ChallengeController.PlayerType type) => type.ToString();
-
-        public void StartNewBotMatch(ChallengeController.PlayerType botTypeA, ChallengeController.PlayerType botTypeB)
+        void StartNewBotMatch(PlayerType botTypeA, PlayerType botTypeB)
         {
             EndGame(GameResult.DrawByArbiter, autoStartNextBotMatch: false);
             botMatchGameIndex = 0;
-            string nameA = GetPlayerName(botTypeA);
-            string nameB = GetPlayerName(botTypeB);
+            string nameA = GetPlayerName(PlayerAType);
+            string nameB = GetPlayerName(PlayerBType);
             if (nameA == nameB)
             {
                 nameA += " (A)";
@@ -294,7 +316,7 @@ namespace ChessChallenge.Application
             BotStatsA = new BotMatchStats(nameA);
             BotStatsB = new BotMatchStats(nameB);
             botAPlaysWhite = true;
-            Log($"Starting new match: {nameA} vs {nameB}", false, ConsoleColor.Blue);
+            Console.WriteLine($"Starting new match: {nameA} vs {nameB}");
             StartNewGame(botTypeA, botTypeB);
         }
 
@@ -320,13 +342,15 @@ namespace ChessChallenge.Application
             public int NumDraws;
             public int NumTimeouts;
             public int NumIllegalMoves;
+            public int TotalGames => NumWins + NumLosses + NumDraws;
 
             public BotMatchStats(string name) => BotName = name;
 
             public void Print()
             {
-                Log("");
-                Log(BotName, false, ConsoleColor.Blue);
+                Console.WriteLine("");
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.WriteLine(BotName);
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.Write($"+{NumWins}");
                 Console.ForegroundColor = ConsoleColor.Gray;
@@ -334,9 +358,32 @@ namespace ChessChallenge.Application
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.Write($"-{NumLosses}");
                 Console.WriteLine();
+
+                int barSize = 50;
+                Console.ForegroundColor = ConsoleColor.Green;
+                for (int i = 0; i < ((float)NumWins / TotalGames) * barSize; i++)
+                {
+                    Console.Write("-");
+                }
+
+                Console.ForegroundColor = ConsoleColor.Gray;
+                for (int i = 0; i < ((float)NumDraws / TotalGames) * barSize; i++)
+                {
+                    Console.Write("-");
+                }
+
+                Console.ForegroundColor = ConsoleColor.Red;
+                for (int i = 0; i < ((float)NumLosses / TotalGames) * barSize; i++)
+                {
+                    Console.Write("-");
+                }
+
+                Console.WriteLine();
+
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.WriteLine($"Timeouts: {NumTimeouts}");
+                Console.WriteLine($"Illegal Moves: {NumIllegalMoves}");
                 Console.ResetColor();
-                Log($"Timeouts: {NumTimeouts}", false, ConsoleColor.Blue);
-                Log($"Illegal Moves: {NumIllegalMoves}", false, ConsoleColor.Blue);
             }
 
             public void UpdateStats(GameResult result, bool isWhiteStats)
@@ -355,8 +402,8 @@ namespace ChessChallenge.Application
                 else
                 {
                     NumLosses++;
-                    NumTimeouts += (result is GameResult.WhiteTimeout or GameResult.BlackTimeout) ? 1 : 0;
-                    NumIllegalMoves += (result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove) ? 1 : 0;
+                    NumTimeouts += result is GameResult.WhiteTimeout or GameResult.BlackTimeout ? 1 : 0;
+                    NumIllegalMoves += result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove ? 1 : 0;
                 }
             }
         }
