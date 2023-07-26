@@ -215,7 +215,7 @@ namespace ChessChallenge.Application
             };
         }
 
-        static int GetTokenCount()
+        public static int GetTokenCount()
         {
             string path = Path.Combine(Directory.GetCurrentDirectory(), "src", "My Bot", "MyBot.cs");
 
@@ -297,7 +297,7 @@ namespace ChessChallenge.Application
                     if (botMatchGameIndex < numGamesToPlay && autoStartNextBotMatch)
                     {
                         botAPlaysWhite = !botAPlaysWhite;
-                        const int startNextGameDelayMs = 600;
+                        const int startNextGameDelayMs = 1;
                         System.Timers.Timer autoNextTimer = new(startNextGameDelayMs);
                         int originalGameID = gameID;
                         autoNextTimer.Elapsed += (s, e) => AutoStartNextBotMatchGame(originalGameID, autoNextTimer);
