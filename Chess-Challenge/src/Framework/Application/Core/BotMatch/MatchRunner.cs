@@ -14,15 +14,7 @@ namespace ChessChallenge.BotMatch
 {
     public class MatchRunner
     {
-        PlayerType PlayerAType;
-        PlayerType PlayerBType;
-        int playerTime;
-
-        public enum PlayerType
-        {
-            MyBot,
-            EvilBot,
-        }
+        MatchParams matchParams;
 
         // Game state
         Random rng;
@@ -61,40 +53,33 @@ namespace ChessChallenge.BotMatch
 
         public bool MatchInProgress;
 
-        static string GetPlayerName(ChessPlayer player) => player.PlayerType.ToString();
-        static string GetPlayerName(PlayerType type) => type.ToString();
-
         double getTime()
         {
             return DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
         }
 
-        public MatchRunner(PlayerType playerAType, PlayerType playerBType, int playerTimeMs)
+        public MatchRunner(MatchParams matchParams)
         {
             Console.WriteLine($"Launching Bot Match version {Settings.Version}");
             Warmer.Warm();
 
-            PlayerAType = playerAType;
-            PlayerBType = playerBType;
-            this.playerTime = playerTimeMs;
+            this.matchParams = matchParams;
 
             rng = new Random();
             moveGenerator = new();
             board = new Board();
             pgns = new();
 
-            BotStatsA = new BotMatchStats(GetPlayerName(PlayerAType));
-            BotStatsB = new BotMatchStats(GetPlayerName(PlayerBType));
+            BotStatsA = new BotMatchStats(Util.GetPlayerName(matchParams.PlayerAType));
+            BotStatsB = new BotMatchStats(Util.GetPlayerName(matchParams.PlayerBType));
             botMatchStartFens = FileHelper.ReadResourceFile("Fens.txt").Split('\n').Where(fen => fen.Length > 0).ToArray();
             botTaskWaitHandle = new AutoResetEvent(false);
-
-            MatchInProgress = true;
-
-            StartNewGame(PlayerAType, PlayerBType);
         }
 
         public void Run()
         {
+            StartNewBotMatch();
+
             while(MatchInProgress)
             {
                 Update();
@@ -112,7 +97,7 @@ namespace ChessChallenge.BotMatch
 
         ChessPlayer MakeBot(api::IChessBot bot)
         {
-            return new ChessPlayer(bot, ChallengeController.PlayerType.MyBot, playerTime);
+            return new ChessPlayer(bot, ChallengeController.PlayerType.MyBot, matchParams.PlayerTimeMS);
         }
 
         void StartNewGame(PlayerType whiteType, PlayerType blackType)
@@ -240,7 +225,7 @@ namespace ChessChallenge.BotMatch
             isWaitingToPlayMove = false;
             gameID = -1;
 
-            string pgn = PGNCreator.CreatePGN(board, result, GetPlayerName(PlayerWhite), GetPlayerName(PlayerBlack));
+            string pgn = PGNCreator.CreatePGN(board, result, Util.GetPlayerName(PlayerWhite), Util.GetPlayerName(PlayerBlack));
             pgns.AppendLine(pgn);
 
             // If 2 bots playing each other, start next game automatically.
@@ -269,7 +254,7 @@ namespace ChessChallenge.BotMatch
         {
             if (originalGameID == gameID)
             {
-                StartNewGame(botAPlaysWhite ? PlayerAType : PlayerBType, botAPlaysWhite ? PlayerBType : PlayerAType);
+                StartNewGame(botAPlaysWhite ? matchParams.PlayerAType : matchParams.PlayerBType, botAPlaysWhite ? matchParams.PlayerBType : matchParams.PlayerAType);
             }
         }
 
@@ -302,12 +287,13 @@ namespace ChessChallenge.BotMatch
             }
         }
 
-        void StartNewBotMatch(PlayerType botTypeA, PlayerType botTypeB)
+        void StartNewBotMatch()
         {
+            MatchInProgress = true;
             EndGame(GameResult.DrawByArbiter, autoStartNextBotMatch: false);
             botMatchGameIndex = 0;
-            string nameA = GetPlayerName(PlayerAType);
-            string nameB = GetPlayerName(PlayerBType);
+            string nameA = Util.GetPlayerName(matchParams.PlayerAType);
+            string nameB = Util.GetPlayerName(matchParams.PlayerBType);
             if (nameA == nameB)
             {
                 nameA += " (A)";
@@ -317,7 +303,7 @@ namespace ChessChallenge.BotMatch
             BotStatsB = new BotMatchStats(nameB);
             botAPlaysWhite = true;
             Console.WriteLine($"Starting new match: {nameA} vs {nameB}");
-            StartNewGame(botTypeA, botTypeB);
+            StartNewGame(matchParams.PlayerAType, matchParams.PlayerBType);
         }
 
         bool IsLegal(Move givenMove)

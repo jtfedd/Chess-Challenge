@@ -7,7 +7,13 @@ namespace ChessChallenge.Application
     {
         public static void BotMatchMain()
         {
-            MatchRunner runner = new(MatchRunner.PlayerType.MyBot, MatchRunner.PlayerType.EvilBot, 60 * 1000);
+            MatchParams matchParams = new(
+                PlayerType.MyBot,
+                PlayerType.EvilBot,
+                60 * 1000
+            );
+
+            MatchRunner runner = new(matchParams);
             runner.Run();
         }
     }
