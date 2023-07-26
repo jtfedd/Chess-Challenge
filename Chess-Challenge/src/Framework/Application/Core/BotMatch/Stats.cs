@@ -22,14 +22,13 @@ namespace ChessChallenge.BotMatch
 
         public void UpdateStats(GameResult result, bool isWhiteStats)
         {
-            if (Arbiter.IsWhiteWinsResult(result) == isWhiteStats) NumWins++;
+            if (Arbiter.IsWhiteWinsResult(result) && isWhiteStats) NumWins++;
+            else if (Arbiter.IsBlackWinsResult(result) && !isWhiteStats) NumWins++;
             else if (Arbiter.IsDrawResult(result)) NumDraws++;
-            else
-            {
-                NumLosses++;
-                NumTimeouts += result is GameResult.WhiteTimeout or GameResult.BlackTimeout ? 1 : 0;
-                NumIllegalMoves += result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove ? 1 : 0;
-            }
+            else NumLosses++;
+
+            NumTimeouts += result is GameResult.WhiteTimeout or GameResult.BlackTimeout ? 1 : 0;
+            NumIllegalMoves += result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove ? 1 : 0;
         }
 
         public void Print()
@@ -58,7 +57,7 @@ namespace ChessChallenge.BotMatch
             Console.WriteLine();
 
             int barSize = 50;
-            char barChar = '#';
+            char barChar = '█';
             Console.ForegroundColor = ConsoleColor.Green;
             for (int i = 0; i < winPct * barSize; i++) Console.Write(barChar);
 
