@@ -18,12 +18,6 @@ public class MyBot : IChessBot
 
         foreach (Move move in allMoves)
         {
-            // Always play checkmate in one
-            if (MoveIsCheckmate(board, move))
-            {
-                return move;
-            }
-
             // Find move that results in the highest board score
             int score = moveScore(board, move);
             if (!board.IsWhiteToMove)
@@ -49,33 +43,27 @@ public class MyBot : IChessBot
     int moveScore(Board board, Move move)
     {
         board.MakeMove(move);
-        int score = pieceValueScore(board);
+        int score = evaluate(board);
         board.UndoMove(move);
         return score;
     }
 
-    int pieceValueScore(Board board)
+    int evaluate(Board board)
     {
-        int s = 0;
+        if (board.IsInCheckmate()) return board.IsWhiteToMove ? int.MinValue : int.MaxValue;
+        if (board.IsDraw()) return 0;
 
-        foreach(PieceList pieces in board.GetAllPieceLists())
+        int score = 0;
+
+        foreach (PieceList pieces in board.GetAllPieceLists())
         {
-            foreach(Piece piece in pieces)
+            foreach (Piece piece in pieces)
             {
                 int value = pieceValues[(int)piece.PieceType];
-                s += piece.IsWhite ? value : -value;
+                score += piece.IsWhite ? value : -value;
             }
         }
 
-        return s;
-    }
-
-    // Test if this move gives checkmate
-    bool MoveIsCheckmate(Board board, Move move)
-    {
-        board.MakeMove(move);
-        bool isMate = board.IsInCheckmate();
-        board.UndoMove(move);
-        return isMate;
+        return score;
     }
 }
