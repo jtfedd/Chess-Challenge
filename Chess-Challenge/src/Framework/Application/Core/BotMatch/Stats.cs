@@ -8,28 +8,22 @@ namespace ChessChallenge.BotMatch
     public class BotMatchStats
     {
         public string BotName;
+
         public int NumWins;
         public int NumLosses;
         public int NumDraws;
+
         public int NumTimeouts;
         public int NumIllegalMoves;
+
         public int TotalGames => NumWins + NumLosses + NumDraws;
 
         public BotMatchStats(string name) => BotName = name;
 
         public void UpdateStats(GameResult result, bool isWhiteStats)
         {
-            // Draw
-            if (Arbiter.IsDrawResult(result))
-            {
-                NumDraws++;
-            }
-            // Win
-            else if (Arbiter.IsWhiteWinsResult(result) == isWhiteStats)
-            {
-                NumWins++;
-            }
-            // Loss
+            if (Arbiter.IsWhiteWinsResult(result) == isWhiteStats) NumWins++;
+            else if (Arbiter.IsDrawResult(result)) NumDraws++;
             else
             {
                 NumLosses++;
