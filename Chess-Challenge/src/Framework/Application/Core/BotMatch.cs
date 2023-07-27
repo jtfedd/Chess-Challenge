@@ -14,7 +14,8 @@ namespace ChessChallenge.Application
                 BotType.MyBot,
                 BotType.EvilBot,
                 startFens,
-                60 * 1000
+                60 * 1000,
+                1
             );
 
             MatchRunner runner = new(matchParams);

@@ -9,12 +9,20 @@
 
         public string[] fens;
 
-        public MatchParams(BotType playerAType, BotType playerBType, string[] fens, int playerTimeMS)
-        {
+        public int numThreads;
+
+        public MatchParams(
+            BotType playerAType,
+            BotType playerBType,
+            string[] fens,
+            int playerTimeMS,
+            int numThreads
+        ) {
             PlayerAType = playerAType;
             PlayerBType = playerBType;
             PlayerTimeMS = playerTimeMS;
             this.fens = fens;
+            this.numThreads = numThreads;
         }
     }
 }
