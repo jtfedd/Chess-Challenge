@@ -83,20 +83,6 @@ namespace ChessChallenge.BotMatch
             }
         }
 
-        ChessPlayer CreatePlayer(BotType type)
-        {
-            return type switch
-            {
-                BotType.MyBot => MakeBot(new MyBot()),
-                BotType.EvilBot => MakeBot(new EvilBot()),
-            };
-        }
-
-        ChessPlayer MakeBot(api::IChessBot bot)
-        {
-            return new ChessPlayer(bot, ChallengeController.PlayerType.MyBot, matchParams.PlayerTimeMS);
-        }
-
         void StartNewGame(BotType whiteType, BotType blackType)
         {
             // End any ongoing game
@@ -118,8 +104,9 @@ namespace ChessChallenge.BotMatch
             board.LoadPosition(matchParams.fens[fenIndex]);
 
             // Player Setup
-            PlayerWhite = CreatePlayer(whiteType);
-            PlayerBlack = CreatePlayer(blackType);
+            BotFactory factory = new BotFactory(matchParams.PlayerTimeMS);
+            PlayerWhite = factory.CreatePlayer(whiteType);
+            PlayerBlack = factory.CreatePlayer(blackType);
 
             // Start
             isPlaying = true;

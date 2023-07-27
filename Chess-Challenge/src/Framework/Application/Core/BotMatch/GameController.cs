@@ -15,22 +15,14 @@ namespace ChessChallenge.BotMatch
         public GameController(GameParams gameParams)
         {
             this.gameParams = gameParams;
-
-            PlayerWhite = CreatePlayer(gameParams.whitePlayer.type);
+            initPlayers();
         }
 
-        ChessPlayer CreatePlayer(BotType type)
+        void initPlayers()
         {
-            return type switch
-            {
-                BotType.MyBot => MakeBot(new MyBot()),
-                BotType.EvilBot => MakeBot(new EvilBot()),
-            };
-        }
-
-        ChessPlayer MakeBot(api::IChessBot bot)
-        {
-            return new ChessPlayer(bot, ChallengeController.PlayerType.MyBot, gameParams.PlayerTimeMS);
+            BotFactory botFactory = new BotFactory(gameParams.playerTimeMS);
+            PlayerWhite = botFactory.CreatePlayer(gameParams.whitePlayer.type);
+            PlayerBlack = botFactory.CreatePlayer(gameParams.blackPlayer.type);
         }
     }
 }

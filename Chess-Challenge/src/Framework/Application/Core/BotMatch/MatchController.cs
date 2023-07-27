@@ -32,7 +32,8 @@
                     gameIndex,
                     fen,
                     botA,
-                    botB
+                    botB,
+                    matchParams.PlayerTimeMS
                 );
 
                 gameIndex++;
@@ -41,7 +42,8 @@
                     gameIndex,
                     fen,
                     botB,
-                    botA
+                    botA,
+                    matchParams.PlayerTimeMS
                 );
 
                 gameIndex++;
