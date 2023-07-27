@@ -2,16 +2,19 @@
 {
     public class MatchParams
     {
-        public PlayerType PlayerAType;
-        public PlayerType PlayerBType;
+        public BotType PlayerAType;
+        public BotType PlayerBType;
 
         public int PlayerTimeMS;
 
-        public MatchParams(PlayerType playerAType, PlayerType playerBType, int playerTimeMS)
+        public string[] fens;
+
+        public MatchParams(BotType playerAType, BotType playerBType, string[] fens, int playerTimeMS)
         {
             PlayerAType = playerAType;
             PlayerBType = playerBType;
             PlayerTimeMS = playerTimeMS;
+            this.fens = fens;
         }
     }
 }

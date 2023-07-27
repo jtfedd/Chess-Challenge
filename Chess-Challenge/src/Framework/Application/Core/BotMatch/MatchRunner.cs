@@ -27,13 +27,11 @@ namespace ChessChallenge.BotMatch
         bool isWaitingToPlayMove;
         double lastUpdateTime;
         Move moveToPlay;
-        public bool HumanWasWhiteLastGame { get; private set; }
 
         // Bot match state
-        readonly string[] botMatchStartFens;
         int botMatchGameIndex;
-        public BotMatchStats BotStatsA { get; private set; }
-        public BotMatchStats BotStatsB { get; private set; }
+        public BotStats BotStatsA { get; private set; }
+        public BotStats BotStatsB { get; private set; }
         bool botAPlaysWhite;
 
 
@@ -47,7 +45,7 @@ namespace ChessChallenge.BotMatch
         readonly StringBuilder pgns;
 
         ChessPlayer PlayerToMove => board.IsWhiteToMove ? PlayerWhite : PlayerBlack;
-        public int TotalGameCount => botMatchStartFens.Length * 2;
+        public int TotalGameCount => matchParams.fens.Length * 2;
         public int CurrGameNumber => Math.Min(TotalGameCount, botMatchGameIndex + 1);
         public string AllPGNs => pgns.ToString();
 
@@ -70,9 +68,8 @@ namespace ChessChallenge.BotMatch
             board = new Board();
             pgns = new();
 
-            BotStatsA = new BotMatchStats(Util.GetPlayerName(matchParams.PlayerAType));
-            BotStatsB = new BotMatchStats(Util.GetPlayerName(matchParams.PlayerBType));
-            botMatchStartFens = FileHelper.ReadResourceFile("Fens.txt").Split('\n').Where(fen => fen.Length > 0).ToArray();
+            BotStatsA = new BotStats(Util.GetPlayerName(matchParams.PlayerAType));
+            BotStatsB = new BotStats(Util.GetPlayerName(matchParams.PlayerBType));
             botTaskWaitHandle = new AutoResetEvent(false);
         }
 
@@ -86,12 +83,12 @@ namespace ChessChallenge.BotMatch
             }
         }
 
-        ChessPlayer CreatePlayer(PlayerType type)
+        ChessPlayer CreatePlayer(BotType type)
         {
             return type switch
             {
-                PlayerType.MyBot => MakeBot(new MyBot()),
-                PlayerType.EvilBot => MakeBot(new EvilBot()),
+                BotType.MyBot => MakeBot(new MyBot()),
+                BotType.EvilBot => MakeBot(new EvilBot()),
             };
         }
 
@@ -100,7 +97,7 @@ namespace ChessChallenge.BotMatch
             return new ChessPlayer(bot, ChallengeController.PlayerType.MyBot, matchParams.PlayerTimeMS);
         }
 
-        void StartNewGame(PlayerType whiteType, PlayerType blackType)
+        void StartNewGame(BotType whiteType, BotType blackType)
         {
             // End any ongoing game
             EndGame(GameResult.DrawByArbiter, autoStartNextBotMatch: false);
@@ -118,7 +115,7 @@ namespace ChessChallenge.BotMatch
             // Board Setup
             board = new Board();
             int fenIndex = botMatchGameIndex / 2;
-            board.LoadPosition(botMatchStartFens[fenIndex]);
+            board.LoadPosition(matchParams.fens[fenIndex]);
 
             // Player Setup
             PlayerWhite = CreatePlayer(whiteType);
@@ -299,8 +296,8 @@ namespace ChessChallenge.BotMatch
                 nameA += " (A)";
                 nameB += " (B)";
             }
-            BotStatsA = new BotMatchStats(nameA);
-            BotStatsB = new BotMatchStats(nameB);
+            BotStatsA = new BotStats(nameA);
+            BotStatsB = new BotStats(nameB);
             botAPlaysWhite = true;
             Console.WriteLine($"Starting new match: {nameA} vs {nameB}");
             StartNewGame(matchParams.PlayerAType, matchParams.PlayerBType);

@@ -5,7 +5,7 @@ using System;
 
 namespace ChessChallenge.BotMatch
 {
-    public class BotMatchStats
+    public class BotStats
     {
         public string BotName;
 
@@ -18,7 +18,7 @@ namespace ChessChallenge.BotMatch
 
         public int TotalGames => NumWins + NumLosses + NumDraws;
 
-        public BotMatchStats(string name) => BotName = name;
+        public BotStats(string name) => BotName = name;
 
         public void UpdateStats(GameResult result, bool isWhiteStats)
         {
