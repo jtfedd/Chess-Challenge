@@ -1,6 +1,5 @@
 ﻿using ChessChallenge.Application;
-using ChessChallenge.Example;
-using api = ChessChallenge.API;
+using ChessChallenge.Chess;
 
 
 namespace ChessChallenge.BotMatch
@@ -11,11 +10,17 @@ namespace ChessChallenge.BotMatch
 
         ChessPlayer PlayerWhite;
         ChessPlayer PlayerBlack;
+        ChessPlayer PlayerToMove => board.IsWhiteToMove ? PlayerWhite : PlayerBlack;
+
+        Board board;
 
         public GameController(GameParams gameParams)
         {
             this.gameParams = gameParams;
             initPlayers();
+
+            board = new Board();
+            board.LoadPosition(gameParams.fen);
         }
 
         void initPlayers()
