@@ -2,12 +2,15 @@
 
 using ChessChallenge.Chess;
 using System;
+using System.Threading;
 
 namespace ChessChallenge.BotMatch
 {
     public class BotStats
     {
         public string BotName;
+
+        Mutex mutex;
 
         public int NumWins;
         public int NumLosses;
@@ -18,10 +21,16 @@ namespace ChessChallenge.BotMatch
 
         public int TotalGames => NumWins + NumLosses + NumDraws;
 
-        public BotStats(string name) => BotName = name;
+        public BotStats(string name)
+        {
+            BotName = name;
+            mutex = new Mutex(false);
+        }
 
         public void UpdateStats(GameResult result, bool isWhiteStats)
         {
+            mutex.WaitOne();
+
             if (Arbiter.IsWhiteWinsResult(result) && isWhiteStats) NumWins++;
             else if (Arbiter.IsBlackWinsResult(result) && !isWhiteStats) NumWins++;
             else if (Arbiter.IsDrawResult(result)) NumDraws++;
@@ -29,10 +38,14 @@ namespace ChessChallenge.BotMatch
 
             NumTimeouts += result is GameResult.WhiteTimeout or GameResult.BlackTimeout ? 1 : 0;
             NumIllegalMoves += result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove ? 1 : 0;
+
+            mutex.ReleaseMutex();
         }
 
         public void Print()
         {
+            mutex.WaitOne();
+
             Console.WriteLine("");
             Console.ForegroundColor = ConsoleColor.Blue;
             Console.WriteLine(BotName);
@@ -74,6 +87,8 @@ namespace ChessChallenge.BotMatch
             Console.ForegroundColor = NumTimeouts > 0 ? ConsoleColor.Red : ConsoleColor.Gray;
             Console.WriteLine($"Illegal Moves: {NumIllegalMoves}");
             Console.ResetColor();
+
+            mutex.ReleaseMutex();
         }
     }
 }

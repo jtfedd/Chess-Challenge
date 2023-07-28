@@ -6,6 +6,7 @@ namespace ChessChallenge.BotMatch
 {
     public class GameController
     {
+        MatchController matchController;
         GameParams gameParams;
 
         ChessPlayer PlayerWhite;
@@ -14,8 +15,9 @@ namespace ChessChallenge.BotMatch
 
         Board board;
 
-        public GameController(GameParams gameParams)
+        public GameController(MatchController matchController, GameParams gameParams)
         {
+            this.matchController = matchController;
             this.gameParams = gameParams;
             initPlayers();
 
