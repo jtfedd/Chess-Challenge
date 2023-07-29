@@ -1,12 +1,11 @@
 ﻿using ChessChallenge.Application;
 using ChessChallenge.Chess;
-
+using System;
 
 namespace ChessChallenge.BotMatch
 {
     public class GameController
     {
-        MatchController matchController;
         GameParams gameParams;
 
         ChessPlayer PlayerWhite;
@@ -14,10 +13,13 @@ namespace ChessChallenge.BotMatch
         ChessPlayer PlayerToMove => board.IsWhiteToMove ? PlayerWhite : PlayerBlack;
 
         Board board;
+        GameResult result;
 
-        public GameController(MatchController matchController, GameParams gameParams)
+        public GameResult getResult() => result;
+        public Board getBoard() => board;
+
+        public GameController(GameParams gameParams)
         {
-            this.matchController = matchController;
             this.gameParams = gameParams;
             initPlayers();
 
@@ -30,6 +32,11 @@ namespace ChessChallenge.BotMatch
             BotFactory botFactory = new BotFactory(gameParams.playerTimeMS);
             PlayerWhite = botFactory.CreatePlayer(gameParams.whitePlayer.type);
             PlayerBlack = botFactory.CreatePlayer(gameParams.blackPlayer.type);
+        }
+
+        public void Play()
+        {
+            return;
         }
     }
 }

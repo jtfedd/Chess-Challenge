@@ -1,6 +1,8 @@
-﻿using System;
+﻿using ChessChallenge.Chess;
+using System;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace ChessChallenge.BotMatch
 {
@@ -47,21 +49,42 @@ namespace ChessChallenge.BotMatch
             gameMutex.ReleaseMutex();
 
             // Launch game thread
+            Task.Factory.StartNew(() => GameThread(game), TaskCreationOptions.LongRunning);
         }
 
-        public void OnGameComplete(string pgn)
+        void GameThread(GameParams game)
+        {
+            GameController gameController = new GameController(game);
+            gameController.Play();
+
+            Board finalBoard = gameController.getBoard();
+            GameResult finalResult = gameController.getResult();
+
+            OnGameComplete(game, finalBoard, finalResult);
+        }
+
+        public void OnGameComplete(GameParams game, Board board, GameResult result)
         {
             bool isMatchComplete = false;
 
             gameMutex.WaitOne();
 
             gamesComplete++;
+            Console.WriteLine($"{gamesComplete} game{(gamesComplete > 1 ? "s" : "")} complete");
+
+            game.whitePlayer.stats.UpdateStats(result, true);
+            game.blackPlayer.stats.UpdateStats(result, false);
+
+            string pgn = PGNCreator.CreatePGN(board, result, Util.GetPlayerName(game.whitePlayer.type), Util.GetPlayerName(game.blackPlayer.type));
             pgns.AppendLine(pgn);
+
             isMatchComplete = matchComplete;
 
             gameMutex.ReleaseMutex();
 
-            if (matchComplete)
+            
+
+            if (isMatchComplete)
             {
                 OnMatchComplete();
             }
