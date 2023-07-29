@@ -6,13 +6,14 @@ namespace ChessChallenge.BotMatch
 {
     public class MatchBots
     {
-        public static BotType A = BotType.MyBot;
+        public static BotType A = BotType.Negamax;
         public static BotType B = BotType.ExampleBot;
     }
 
     public enum BotType
     {
         MyBot,
+        Negamax,
         EvilBot,
         ExampleBot,
     }
@@ -24,6 +25,7 @@ namespace ChessChallenge.BotMatch
             return type switch
             {
                 BotType.MyBot => MakeBot(new MyBot()),
+                BotType.Negamax => MakeBot(new Negamax()),
                 BotType.EvilBot => MakeBot(new EvilBot()),
                 BotType.ExampleBot => MakeBot(new ExampleBot()),
             };
