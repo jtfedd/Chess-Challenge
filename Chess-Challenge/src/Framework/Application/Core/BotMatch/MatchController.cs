@@ -1,4 +1,5 @@
-﻿using ChessChallenge.Chess;
+﻿using ChessChallenge.Application;
+using ChessChallenge.Chess;
 using System;
 using System.Text;
 using System.Threading;
@@ -20,8 +21,14 @@ namespace ChessChallenge.BotMatch
         bool matchComplete => gamesComplete == games.Length;
         StringBuilder pgns;
 
+        AutoResetEvent matchCompleteHandle;
+
         public MatchController(MatchParams matchParams)
         {
+            Console.WriteLine($"Launching Bot Match version {Settings.Version}");
+
+            Warmer.Warm();
+
             this.matchParams = matchParams;
             games = GenerateGames();
 
@@ -29,6 +36,8 @@ namespace ChessChallenge.BotMatch
             gameIndex = 0;
             gamesComplete = 0;
             pgns = new();
+
+            matchCompleteHandle = new AutoResetEvent(false);
         }
 
         public void Run()
@@ -37,6 +46,8 @@ namespace ChessChallenge.BotMatch
             {
                 StartNextGame();
             }
+
+            matchCompleteHandle.WaitOne();
         }
 
         public void StartNextGame()
@@ -44,7 +55,14 @@ namespace ChessChallenge.BotMatch
             gameMutex.WaitOne();
 
             int gameID = gameIndex++;
-            GameParams game = games[gameIndex];
+
+            if (gameID >= games.Length)
+            {
+                gameMutex.ReleaseMutex();
+                return;
+            }
+
+            GameParams game = games[gameID];
 
             gameMutex.ReleaseMutex();
 
@@ -82,8 +100,6 @@ namespace ChessChallenge.BotMatch
 
             gameMutex.ReleaseMutex();
 
-            
-
             if (isMatchComplete)
             {
                 OnMatchComplete();
@@ -99,6 +115,7 @@ namespace ChessChallenge.BotMatch
             Console.WriteLine("Match Finished");
             playerA.stats.Print();
             playerB.stats.Print();
+            matchCompleteHandle.Set();
         }
 
         GameParams[] GenerateGames()
