@@ -1,8 +1,8 @@
 ﻿using ChessChallenge.API;
 using System;
+using System.Numerics;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 
 public class MyBot : IChessBot
 {
@@ -10,6 +10,7 @@ public class MyBot : IChessBot
     int[] pieceValues = { 0, 100, 300, 320, 500, 900, 0 };
 
     Random rng;
+    Board board;
 
     public MyBot()
     {
@@ -18,17 +19,16 @@ public class MyBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
-        // Pick a random move to play if nothing better is found
+        this.board = board;
+
         int highestScore = int.MinValue;
-        List<Move> candidateMoves = new List<Move>();
+        List<Move> candidateMoves = new();
         bool isWhite = board.IsWhiteToMove;
 
         foreach (Move move in board.GetLegalMoves())
         {
             board.MakeMove(move);
-
-            int score = -search(board, !isWhite, 2, -int.MaxValue, int.MaxValue);
-
+            int score = -search(!isWhite, 2, -int.MaxValue, int.MaxValue);
             board.UndoMove(move);
 
             if (score > highestScore)
@@ -37,32 +37,23 @@ public class MyBot : IChessBot
                 highestScore = score;
             }
             
-            if (score == highestScore)
-            {
-                candidateMoves.Add(move);
-            }
+            if (score == highestScore) candidateMoves.Add(move);
         }
 
         return candidateMoves[rng.Next(candidateMoves.Count)];
     }
 
-    int search(Board board, bool isWhite, int depth, int alpha, int beta)
+    int search(bool isWhite, int depth, int alpha, int beta)
     {
         int best_score = -int.MaxValue;
 
-        foreach (Move move in board.GetLegalMoves().OrderBy(c => rng.Next()))
+        foreach (Move move in board.GetLegalMoves())
         {
             board.MakeMove(move);
 
-            int move_score;
-            if (depth == 0 || board.IsInCheckmate() || board.IsDraw())
-            {
-                move_score = evaluate(board) * (isWhite ? 1 : -1);
-            }
-            else
-            {
-                move_score = -search(board, !isWhite, depth - 1, -beta, -alpha);
-            }
+            int move_score = (depth == 0 || board.IsInCheckmate() || board.IsDraw()) 
+                ? evaluate() * (isWhite ? 1 : -1)
+                : -search(!isWhite, depth - 1, -beta, -alpha);
 
             board.UndoMove(move);
 
@@ -74,7 +65,7 @@ public class MyBot : IChessBot
         return best_score;
     }
 
-    int evaluate(Board board)
+    int evaluate()
     {
         if (board.IsInCheckmate()) return -int.MaxValue;
         if (board.IsDraw()) return 0;

@@ -4,7 +4,6 @@ using ChessChallenge.Application;
 using ChessChallenge.Chess;
 using System;
 using System.IO;
-using System.Threading;
 
 namespace ChessChallenge.BotMatch
 {
@@ -12,14 +11,22 @@ namespace ChessChallenge.BotMatch
     {
         public string BotName;
 
-        public int NumWins;
-        public int NumLosses;
-        public int NumDraws;
+        public int WhiteWins;
+        public int BlackWins;
+        public int TotalWins => WhiteWins + BlackWins;
+
+        public int WhiteLosses;
+        public int BlackLosses;
+        public int TotalLosses => WhiteLosses + BlackLosses;
+
+        public int WhiteDraws;
+        public int BlackDraws;
+        public int TotalDraws => WhiteDraws + BlackDraws;
 
         public int NumTimeouts;
         public int NumIllegalMoves;
 
-        public int TotalGames => NumWins + NumLosses + NumDraws;
+        public int TotalGames => TotalWins + TotalLosses + TotalDraws;
 
         public BotStats(string name)
         {
@@ -28,10 +35,17 @@ namespace ChessChallenge.BotMatch
 
         public void UpdateStats(GameResult result, bool isWhiteStats)
         {
-            if (Arbiter.IsWhiteWinsResult(result) && isWhiteStats) NumWins++;
-            else if (Arbiter.IsBlackWinsResult(result) && !isWhiteStats) NumWins++;
-            else if (Arbiter.IsDrawResult(result)) NumDraws++;
-            else NumLosses++;
+            if (isWhiteStats)
+            {
+                if (Arbiter.IsWhiteWinsResult(result)) WhiteWins++;
+                else if (Arbiter.IsDrawResult(result)) WhiteDraws++;
+                else WhiteLosses++;
+            } else
+            {
+                if (Arbiter.IsBlackWinsResult(result)) BlackWins++;
+                else if (Arbiter.IsDrawResult(result)) BlackDraws++;
+                else BlackLosses++;
+            }
 
             NumTimeouts += result is GameResult.WhiteTimeout or GameResult.BlackTimeout ? 1 : 0;
             NumIllegalMoves += result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove ? 1 : 0;        }
@@ -53,17 +67,39 @@ namespace ChessChallenge.BotMatch
                 Console.WriteLine("Token Count: <unknown>");
             }
 
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write($"+{NumWins}");
             Console.ForegroundColor = ConsoleColor.Gray;
-            Console.Write($" ={NumDraws} ");
+            Console.WriteLine("As White");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($"+{WhiteWins}");
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.Write($" ={WhiteDraws} ");
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($"-{NumLosses}");
+            Console.Write($"-{WhiteLosses}");
             Console.WriteLine();
 
-            float winPct = (float)NumWins / TotalGames;
-            float drawPct = (float)NumDraws / TotalGames;
-            float lossPct = (float)NumLosses / TotalGames;
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine("As Black");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($"+{BlackWins}");
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.Write($" ={BlackDraws} ");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write($"-{BlackLosses}");
+            Console.WriteLine();
+
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine("Overall Stats");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write($"+{TotalWins}");
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.Write($" ={TotalDraws} ");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write($"-{TotalLosses}");
+            Console.WriteLine();
+
+            float winPct = (float)TotalWins / TotalGames;
+            float drawPct = (float)TotalDraws / TotalGames;
+            float lossPct = (float)TotalLosses / TotalGames;
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write($" {(int)Math.Round(winPct * 100)}% ");

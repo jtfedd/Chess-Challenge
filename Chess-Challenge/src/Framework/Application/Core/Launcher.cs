@@ -13,6 +13,7 @@ namespace ChessChallenge.Application
     {
         public static void Main()
         {
+            Console.WriteLine("MyBot Tokens: " + ChallengeController.GetTokenCount());
             BotMatch.BotMatchMain();
             //Program.ProgramMain();
         }

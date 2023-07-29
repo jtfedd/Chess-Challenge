@@ -6,7 +6,7 @@ namespace ChessChallenge.BotMatch
 {
     public class MatchBots
     {
-        public static BotType A = BotType.Negamax;
+        public static BotType A = BotType.MyBot;
         public static BotType B = BotType.ExampleBot;
     }
 

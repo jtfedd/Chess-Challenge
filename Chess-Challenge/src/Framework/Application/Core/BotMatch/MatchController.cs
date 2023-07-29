@@ -26,7 +26,7 @@ namespace ChessChallenge.BotMatch
         public MatchController(MatchParams matchParams)
         {
             Console.WriteLine($"Launching Bot Match version {Settings.Version}");
-
+            Console.WriteLine($"{matchParams.PlayerAType.ToString()} vs {matchParams.PlayerBType.ToString()}");
             Warmer.Warm();
 
             this.matchParams = matchParams;
@@ -63,6 +63,7 @@ namespace ChessChallenge.BotMatch
             }
 
             GameParams game = games[gameID];
+            Console.WriteLine($"{game.id} Starting");
 
             gameMutex.ReleaseMutex();
 
@@ -72,6 +73,7 @@ namespace ChessChallenge.BotMatch
 
         void GameThread(GameParams game)
         {
+            Console.WriteLine($"{game.id} Playing");
             GameController gameController = new GameController(game);
             gameController.Play();
 
@@ -88,7 +90,7 @@ namespace ChessChallenge.BotMatch
             gameMutex.WaitOne();
 
             gamesComplete++;
-            Console.WriteLine($"({gamesComplete}/{games.Length}) Game Over: " + result);
+            Console.WriteLine($"{game.id} Finished: " + result);
 
             game.whitePlayer.stats.UpdateStats(result, true);
             game.blackPlayer.stats.UpdateStats(result, false);
@@ -114,7 +116,7 @@ namespace ChessChallenge.BotMatch
         {
             Console.WriteLine("Match Finished");
             playerA.stats.Print();
-            playerB.stats.Print();
+            //playerB.stats.Print();
             matchCompleteHandle.Set();
         }
 
