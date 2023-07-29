@@ -4,10 +4,17 @@ using api = ChessChallenge.API;
 
 namespace ChessChallenge.BotMatch
 {
+    public class MatchBots
+    {
+        public static BotType A = BotType.MyBot;
+        public static BotType B = BotType.ExampleBot;
+    }
+
     public enum BotType
     {
         MyBot,
         EvilBot,
+        ExampleBot,
     }
 
     public class BotFactory
@@ -18,6 +25,7 @@ namespace ChessChallenge.BotMatch
             {
                 BotType.MyBot => MakeBot(new MyBot()),
                 BotType.EvilBot => MakeBot(new EvilBot()),
+                BotType.ExampleBot => MakeBot(new ExampleBot()),
             };
         }
 

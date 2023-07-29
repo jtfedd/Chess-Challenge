@@ -88,7 +88,7 @@ namespace ChessChallenge.BotMatch
             gameMutex.WaitOne();
 
             gamesComplete++;
-            Console.WriteLine($"{gamesComplete} game{(gamesComplete > 1 ? "s" : "")} complete");
+            Console.WriteLine($"({gamesComplete}/{games.Length}) Game Over: " + result);
 
             game.whitePlayer.stats.UpdateStats(result, true);
             game.blackPlayer.stats.UpdateStats(result, false);

@@ -13,14 +13,8 @@ namespace ChessChallenge.Application
     {
         public static void Main()
         {
-            PrintTokenCount();
             BotMatch.BotMatchMain();
             //Program.ProgramMain();
-        }
-
-        static void PrintTokenCount()
-        {
-            Log($"Token Count: {ChallengeController.GetTokenCount()}");
         }
     }
 }

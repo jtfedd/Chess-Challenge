@@ -1,7 +1,9 @@
 ﻿
 
+using ChessChallenge.Application;
 using ChessChallenge.Chess;
 using System;
+using System.IO;
 using System.Threading;
 
 namespace ChessChallenge.BotMatch
@@ -39,6 +41,18 @@ namespace ChessChallenge.BotMatch
             Console.WriteLine("");
             Console.ForegroundColor = ConsoleColor.Blue;
             Console.WriteLine(BotName);
+
+            Console.ForegroundColor = ConsoleColor.Gray;
+            try
+            {
+                int tokens = GetTokenCount();
+                Console.WriteLine($"Token Count: {tokens}");
+            }
+            catch
+            {
+                Console.WriteLine("Token Count: <unknown>");
+            }
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write($"+{NumWins}");
             Console.ForegroundColor = ConsoleColor.Gray;
@@ -77,6 +91,15 @@ namespace ChessChallenge.BotMatch
             Console.ForegroundColor = NumTimeouts > 0 ? ConsoleColor.Red : ConsoleColor.Gray;
             Console.WriteLine($"Illegal Moves: {NumIllegalMoves}");
             Console.ResetColor();
+        }
+
+        public int GetTokenCount()
+        {
+            string path = Path.Combine(Directory.GetCurrentDirectory(), "src", "My Bot", $"{BotName}.cs");
+
+            using StreamReader reader = new(path);
+            string txt = reader.ReadToEnd();
+            return TokenCounter.CountTokens(txt);
         }
     }
 }
