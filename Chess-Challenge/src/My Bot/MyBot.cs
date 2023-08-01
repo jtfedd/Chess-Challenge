@@ -5,10 +5,9 @@ using System.Linq;
 
 // TODO
 // Transposition table
-// Iterative deepening
 // Move ordering
-// Principal variation search
 // Quiescence search (capture pruning)
+// Principal variation search
 // Frontier pruning?
 
 // Improve evaluation
