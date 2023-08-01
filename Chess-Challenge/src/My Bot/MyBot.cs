@@ -19,7 +19,8 @@ public class MyBot : IChessBot
 
     Board board;
     Timer timer;
-    TT_Entry[] tt = new TT_Entry[1048576];
+    const int tt_size = 1048583;
+    TT_Entry[] tt;
 
     // Debug variables
     int cacheHits;
@@ -30,6 +31,11 @@ public class MyBot : IChessBot
     bool cancelled;
 
     Move searchBestMove;
+
+    public MyBot()
+    {
+        tt = new TT_Entry[tt_size];
+    }
 
     public Move Think(Board board, Timer timer)
     {
