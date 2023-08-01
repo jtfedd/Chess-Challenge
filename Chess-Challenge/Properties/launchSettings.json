@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Bot-Match": {
+      "commandName": "Project",
+      "commandLineArgs": "botmatch"
+    },
+    "Chess-UI": {
+      "commandName": "Project",
+      "commandLineArgs": "program"
+    }
+  }
+}

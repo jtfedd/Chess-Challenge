@@ -3,61 +3,90 @@ using System;
 using System.Numerics;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis;
+
+// TODO
+// Transposition table
+// Iterative deepening
+// Move ordering
+// Principal variation search
+// Quiescence search (capture pruning)
+// Frontier pruning?
+
+// Improve evaluation
 
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 300, 320, 500, 900, 0 };
 
-    Random rng;
     Board board;
+    Timer timer;
+    TT_Entry[] tt = new TT_Entry[1048576];
 
-    public MyBot()
-    {
-        rng = new();
-    }
+    // Debug variables
+    int cacheHits;
+    int nodesSearched;
+    int evaluations;
+
+    int msToThink;
+    bool cancelled;
+
+    Move searchBestMove;
 
     public Move Think(Board board, Timer timer)
     {
+        msToThink = timer.MillisecondsRemaining / 35;
+        //msToThink = 500;
+
+        cancelled = false;
+
         this.board = board;
+        this.timer = timer;
 
-        int highestScore = int.MinValue;
-        List<Move> candidateMoves = new();
-        bool isWhite = board.IsWhiteToMove;
+        // Always evaluate at depth 2
+        int depth = 2;
+        search(board.IsWhiteToMove, depth, -int.MaxValue, int.MaxValue, true);
+        Move bestMove = searchBestMove;
 
-        foreach (Move move in board.GetLegalMoves())
+        while (!cancelled)
         {
-            board.MakeMove(move);
-            int score = -search(!isWhite, 2, -int.MaxValue, int.MaxValue);
-            board.UndoMove(move);
-
-            if (score > highestScore)
-            {
-                candidateMoves.Clear();
-                highestScore = score;
-            }
-            
-            if (score == highestScore) candidateMoves.Add(move);
+            cacheHits = 0;
+            nodesSearched = 0;
+            evaluations = 0;
+            search(board.IsWhiteToMove, ++depth, -int.MaxValue, int.MaxValue, true);
+            if (!cancelled) bestMove = searchBestMove;
+            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} evaluations: {evaluations} cache hits: {cacheHits}");
         }
-
-        return candidateMoves[rng.Next(candidateMoves.Count)];
+        return bestMove;
     }
 
-    int search(bool isWhite, int depth, int alpha, int beta)
+    int search(bool isWhite, int depth, int alpha, int beta, bool isTopLevel)
     {
-        int best_score = -int.MaxValue;
+        cancelled = timer.MillisecondsElapsedThisTurn > msToThink;
+        if (cancelled) return 0;
+
+        nodesSearched++;
+
+        if (board.IsInCheckmate()) return -int.MaxValue;
+        else if (board.IsDraw()) return 0;
+        else if (depth == 0) return evaluate() * (isWhite ? 1 : -1);
+
+        int best_score = int.MinValue;
 
         foreach (Move move in board.GetLegalMoves())
         {
             board.MakeMove(move);
 
-            int move_score = (depth == 0 || board.IsInCheckmate() || board.IsDraw()) 
-                ? evaluate() * (isWhite ? 1 : -1)
-                : -search(!isWhite, depth - 1, -beta, -alpha);
+            int move_score = -search(!isWhite, depth - 1, -beta, -alpha, false);
 
             board.UndoMove(move);
 
-            if (move_score > best_score) best_score = move_score;
+            if (move_score > best_score) {
+                best_score = move_score;
+                if (isTopLevel) searchBestMove = move;
+            }
             if (best_score > alpha) alpha = best_score;
             if (alpha >= beta) return alpha;
         }
@@ -67,9 +96,7 @@ public class MyBot : IChessBot
 
     int evaluate()
     {
-        if (board.IsInCheckmate()) return -int.MaxValue;
-        if (board.IsDraw()) return 0;
-
+        evaluations++;
         int score = 0;
 
         foreach (PieceList pieces in board.GetAllPieceLists())
@@ -82,5 +109,19 @@ public class MyBot : IChessBot
         }
 
         return score;
+    }
+
+    class TT_Entry
+    {
+        public ulong key;
+        public int depth;
+        public int evaluation;
+
+        public TT_Entry(ulong key, int depth, int evaluation)
+        {
+            this.key = key;
+            this.depth = depth;
+            this.evaluation = evaluation;
+        }
     }
 }

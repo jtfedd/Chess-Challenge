@@ -11,11 +11,11 @@ namespace ChessChallenge.Application
 {
     static class Launcher
     {
-        public static void Main()
+        public static void Main(string[] args)
         {
             Console.WriteLine("MyBot Tokens: " + ChallengeController.GetTokenCount());
-            BotMatch.BotMatchMain();
-            //Program.ProgramMain();
+            if (args[0] == "botmatch") BotMatch.BotMatchMain();
+            if (args[0] == "program") Program.ProgramMain();
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using ChessChallenge.Application;
-using ChessChallenge.Chess;
+﻿using ChessChallenge.Chess;
 using System;
 using System.Text;
 using System.Threading;
@@ -25,9 +24,7 @@ namespace ChessChallenge.BotMatch
 
         public MatchController(MatchParams matchParams)
         {
-            Console.WriteLine($"Launching Bot Match version {Settings.Version}");
-            Console.WriteLine($"{matchParams.PlayerAType.ToString()} vs {matchParams.PlayerBType.ToString()}");
-            Warmer.Warm();
+            Console.WriteLine($"Launching Bot Match {matchParams.PlayerAType} vs {matchParams.PlayerBType}");
 
             this.matchParams = matchParams;
             games = GenerateGames();
@@ -115,6 +112,7 @@ namespace ChessChallenge.BotMatch
         public void OnMatchComplete()
         {
             Console.WriteLine("Match Finished");
+            Console.WriteLine(pgns.ToString());
             playerA.stats.Print();
             //playerB.stats.Print();
             matchCompleteHandle.Set();
@@ -127,30 +125,30 @@ namespace ChessChallenge.BotMatch
             playerA = new Bot(matchParams.PlayerAType, new BotStats(matchParams.PlayerAType.ToString()));
             playerB = new Bot(matchParams.PlayerBType, new BotStats(matchParams.PlayerBType.ToString()));
 
-            int gameIndex = 0;
+            int i = 0;
             for (int fenIndex = 0; fenIndex < matchParams.fens.Length; fenIndex++)
             {
                 string fen = matchParams.fens[fenIndex];
 
-                games[gameIndex] = new GameParams(
-                    gameIndex,
+                games[i] = new GameParams(
+                    i+1,
                     fen,
                     playerA,
                     playerB,
                     matchParams.PlayerTimeMS
                 );
 
-                gameIndex++;
+                i++;
 
-                games[gameIndex] = new GameParams(
-                    gameIndex,
+                games[i] = new GameParams(
+                    i+1,
                     fen,
                     playerB,
                     playerA,
                     matchParams.PlayerTimeMS
                 );
 
-                gameIndex++;
+                i++;
             }
 
             return games;

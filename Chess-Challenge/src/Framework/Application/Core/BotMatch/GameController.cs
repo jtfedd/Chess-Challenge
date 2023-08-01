@@ -16,8 +16,6 @@ namespace ChessChallenge.BotMatch
         Board board;
         GameResult result;
 
-        System.Timers.Timer tickTimer;
-
         public GameResult getResult() => result;
         public Board getBoard() => board;
 
@@ -78,7 +76,7 @@ namespace ChessChallenge.BotMatch
                     return;
                 }
 
-                double moveTime = startTime - getTime();
+                double moveTime = getTime() - startTime;
                 PlayerToMove.UpdateClock(moveTime / 1000.0);
                 if (PlayerToMove.TimeRemainingMs <= 0)
                 {
