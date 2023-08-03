@@ -26,6 +26,7 @@ public class MyBot : IChessBot
     int cacheHits;
     int nodesSearched;
     int evaluations;
+    int cutoffs;
 
     int msToThink;
     bool cancelled;
@@ -39,7 +40,7 @@ public class MyBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
-        msToThink = timer.MillisecondsRemaining / 35;
+        msToThink = timer.MillisecondsRemaining / 40;
         //msToThink = 500;
 
         cancelled = false;
@@ -49,7 +50,7 @@ public class MyBot : IChessBot
 
         // Always evaluate at depth 2
         int depth = 2;
-        search(board.IsWhiteToMove, depth, -int.MaxValue, int.MaxValue, true);
+        search(depth, -int.MaxValue, int.MaxValue, true);
         Move bestMove = searchBestMove;
 
         while (!cancelled)
@@ -57,14 +58,15 @@ public class MyBot : IChessBot
             cacheHits = 0;
             nodesSearched = 0;
             evaluations = 0;
-            search(board.IsWhiteToMove, ++depth, -int.MaxValue, int.MaxValue, true);
+            cutoffs = 0;
+            search(++depth, -int.MaxValue, int.MaxValue, true);
             if (!cancelled) bestMove = searchBestMove;
-            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} evaluations: {evaluations} cache hits: {cacheHits}");
+            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}");
         }
         return bestMove;
     }
 
-    int search(bool isWhite, int depth, int alpha, int beta, bool isTopLevel)
+    int search(int depth, int alpha, int beta, bool isTopLevel)
     {
         cancelled = timer.MillisecondsElapsedThisTurn > msToThink;
         if (cancelled) return 0;
@@ -73,15 +75,15 @@ public class MyBot : IChessBot
 
         if (board.IsInCheckmate()) return -int.MaxValue;
         else if (board.IsDraw()) return 0;
-        else if (depth == 0) return evaluate() * (isWhite ? 1 : -1);
+        else if (depth == 0) return evaluate() * (board.IsWhiteToMove ? 1 : -1);
 
         int best_score = int.MinValue;
 
-        foreach (Move move in board.GetLegalMoves())
+        foreach (Move move in board.GetLegalMoves().OrderByDescending(moveOrder))
         {
             board.MakeMove(move);
 
-            int move_score = -search(!isWhite, depth - 1, -beta, -alpha, false);
+            int move_score = -search(depth - 1, -beta, -alpha, false);
 
             board.UndoMove(move);
 
@@ -90,7 +92,10 @@ public class MyBot : IChessBot
                 if (isTopLevel) searchBestMove = move;
             }
             if (best_score > alpha) alpha = best_score;
-            if (alpha >= beta) return alpha;
+            if (alpha >= beta) {
+                cutoffs++;
+                return alpha;
+            }
         }
 
         return best_score;
@@ -111,6 +116,13 @@ public class MyBot : IChessBot
         }
 
         return score;
+    }
+
+    int moveOrder(Move move)
+    {
+        int moveScore = 0;
+        if (move.CapturePieceType != PieceType.None) moveScore = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
+        return moveScore;
     }
 
     class TT_Entry
