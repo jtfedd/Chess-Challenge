@@ -59,8 +59,7 @@ namespace ChessChallenge.BotMatch
             Console.ForegroundColor = ConsoleColor.Gray;
             try
             {
-                int tokens = GetTokenCount();
-                Console.WriteLine($"Token Count: {tokens}");
+                Console.WriteLine($"Token Count: {GetTokenCount()}");
             }
             catch
             {
@@ -129,7 +128,7 @@ namespace ChessChallenge.BotMatch
             Console.ResetColor();
         }
 
-        public int GetTokenCount()
+        public (int, int) GetTokenCount()
         {
             string path = Path.Combine(Directory.GetCurrentDirectory(), "src", "My Bot", $"{BotName}.cs");
 

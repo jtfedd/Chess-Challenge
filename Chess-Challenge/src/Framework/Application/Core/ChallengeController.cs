@@ -214,7 +214,7 @@ namespace ChessChallenge.Application
             };
         }
 
-        static (int totalTokenCount, int debugTokenCount) GetTokenCount()
+        public static (int totalTokenCount, int debugTokenCount) GetTokenCount()
         {
             string path = Path.Combine(Directory.GetCurrentDirectory(), "src", "My Bot", "MyBot.cs");
 
