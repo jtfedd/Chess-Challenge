@@ -7,7 +7,7 @@ namespace ChessChallenge.BotMatch
     public class MatchBots
     {
         public static BotType A = BotType.MyBot;
-        public static BotType B = BotType.IterativeDeepening;
+        public static BotType B = BotType.Quiescence;
     }
 
     public enum BotType
@@ -15,6 +15,8 @@ namespace ChessChallenge.BotMatch
         MyBot,
         Negamax,
         IterativeDeepening,
+        Quiescence,
+
         EvilBot,
         ExampleBot,
     }
@@ -28,6 +30,8 @@ namespace ChessChallenge.BotMatch
                 BotType.MyBot => MakeBot(new MyBot()),
                 BotType.Negamax => MakeBot(new Negamax()),
                 BotType.IterativeDeepening => MakeBot(new IterativeDeepening()),
+                BotType.Quiescence => MakeBot(new QuiecenseBot()),
+
                 BotType.EvilBot => MakeBot(new EvilBot()),
                 BotType.ExampleBot => MakeBot(new ExampleBot()),
             };
