@@ -25,6 +25,7 @@ public class MyBot : IChessBot
     // Debug variables
     int cacheHits;
     int nodesSearched;
+    int quiesenceNodes;
     int evaluations;
     int cutoffs;
 
@@ -52,16 +53,18 @@ public class MyBot : IChessBot
         int depth = 2;
         search(depth, -int.MaxValue, int.MaxValue, true);
         Move bestMove = searchBestMove;
+        Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}");
 
-        while (!cancelled)
+        while (!cancelled && depth < 5)
         {
             cacheHits = 0;
             nodesSearched = 0;
             evaluations = 0;
             cutoffs = 0;
+            quiesenceNodes = 0;
             search(++depth, -int.MaxValue, int.MaxValue, true);
             if (!cancelled) bestMove = searchBestMove;
-            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}");
+            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}");
         }
         return bestMove;
     }
@@ -75,7 +78,7 @@ public class MyBot : IChessBot
 
         if (board.IsInCheckmate()) return -int.MaxValue;
         else if (board.IsDraw()) return 0;
-        else if (depth == 0) return evaluate() * (board.IsWhiteToMove ? 1 : -1);
+        else if (depth == 0) return quiesce(alpha, beta);
 
         int best_score = int.MinValue;
 
@@ -99,6 +102,39 @@ public class MyBot : IChessBot
         }
 
         return best_score;
+    }
+
+    int quiesce(int alpha, int beta)
+    {
+        cancelled = timer.MillisecondsElapsedThisTurn > msToThink;
+        if (cancelled) return 0;
+
+        quiesenceNodes++;
+
+        if (board.IsInCheckmate()) return -int.MaxValue;
+        else if (board.IsDraw()) return 0;
+
+        int stand_pat = evaluate() * (board.IsWhiteToMove ? 1 : -1);
+        if (stand_pat >= beta)
+            return beta;
+        if (alpha < stand_pat)
+            alpha = stand_pat;
+
+        Move[] moves = board.GetLegalMoves(true).OrderByDescending(moveOrder).ToArray();
+
+        foreach (Move move in moves)
+        {
+            board.MakeMove(move);
+
+            int move_score = -quiesce(-beta, -alpha);
+
+            board.UndoMove(move);
+
+            if (move_score >= beta) return beta;
+            if (move_score > alpha) alpha = move_score;
+        }
+
+        return alpha;
     }
 
     int evaluate()
