@@ -1,11 +1,4 @@
-﻿using Raylib_cs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static ChessChallenge.Application.ConsoleHelper;
-
+﻿using System;
 
 namespace ChessChallenge.Application
 {
@@ -13,9 +6,16 @@ namespace ChessChallenge.Application
     {
         public static void Main(string[] args)
         {
-            Console.WriteLine("MyBot Tokens: " + ChallengeController.GetTokenCount());
+            printTokens();
             if (args[0] == "botmatch") BotMatch.BotMatchMain();
             if (args[0] == "program") Program.ProgramMain();
+            if (args[0] == "benchmark") Benchmarks.Benchmarks.Run();
+        }
+
+        static void printTokens()
+        {
+            var (total, debug) = ChallengeController.GetTokenCount();
+            Console.WriteLine($"MyBot Tokens - Total: {total}, Effective: {total - debug}, Debug: {debug}");
         }
     }
 }
