@@ -21,14 +21,16 @@ using System.Runtime.InteropServices;
 //   - [ ] Pawn structure bonus
 //   - [ ] Defended/attacked pieces bonus
 
+// Token count 771
+
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 320, 330, 550, 900, 10000 };
     int[] bonusParams = { -20, -10, 10, -5, -5, 20, 50, 0, -25, 0, 0, 0, 25, 50, 50, 5, 10, -30 };
 
-    Board board;
-    Timer timer;
+    Board b;
+    Timer t;
     int tt_size = 1048583;
     TT_Entry[] tt;
 
@@ -52,7 +54,7 @@ public class MyBot : IChessBot
         pieceSquareBonuses = new int[6,8,8];
         for (int i = 0; i < 384; i++)
         {
-            int row = (i / 8) % 8;
+            int row = i / 8 % 8;
             int col = i % 8;
             int piece = i / 64;
 
@@ -88,8 +90,8 @@ public class MyBot : IChessBot
 
         cancelled = false;
 
-        this.board = board;
-        this.timer = timer;
+        b = board;
+        t = timer;
 
         Console.WriteLine($"Current evaluation {evaluate()}"); // #DEBUG
 
@@ -116,34 +118,34 @@ public class MyBot : IChessBot
 
     public void benchmarkSearch(Board board, int depth) // #DEBUG
     {// #DEBUG
-        this.board = board;// #DEBUG
-        this.timer = new Timer(int.MaxValue); //#DEBUG
+        b = board;// #DEBUG
+        t = new Timer(int.MaxValue); //#DEBUG
         this.cancelled = false;// #DEBUG
         search(depth, -int.MaxValue, int.MaxValue, true);// #DEBUG
     }// #DEBUG
 
     int search(int depth, int alpha, int beta, bool isTopLevel)
     {
-        cancelled = timer.MillisecondsElapsedThisTurn > msToThink;
+        cancelled = t.MillisecondsElapsedThisTurn > msToThink;
         if (cancelled) return 0;
 
         nodesSearched++; // #DEBUG
 
         // Encourage the engine to fight to the end by making early checkmates
         // have a better score than later checkmates
-        if (board.IsInCheckmate()) return -int.MaxValue + board.PlyCount;
-        else if (board.IsDraw()) return 0;
+        if (b.IsInCheckmate()) return -int.MaxValue + b.PlyCount;
+        else if (b.IsDraw()) return 0;
         else if (depth == 0) return quiesce(alpha, beta);
 
         int best_score = int.MinValue;
 
-        foreach (Move move in board.GetLegalMoves().OrderByDescending(moveOrder))
+        foreach (Move move in b.GetLegalMoves().OrderByDescending(moveOrder))
         {
-            board.MakeMove(move);
+            b.MakeMove(move);
 
             int move_score = -search(depth - 1, -beta, -alpha, false);
 
-            board.UndoMove(move);
+            b.UndoMove(move);
 
             if (move_score > best_score) {
                 best_score = move_score;
@@ -161,27 +163,27 @@ public class MyBot : IChessBot
 
     int quiesce(int alpha, int beta)
     {
-        cancelled = timer.MillisecondsElapsedThisTurn > msToThink;
+        cancelled = t.MillisecondsElapsedThisTurn > msToThink;
         if (cancelled) return 0;
 
         quiesenceNodes++; // #DEBUG
 
-        if (board.IsInCheckmate()) return -int.MaxValue;
-        else if (board.IsDraw()) return 0;
+        if (b.IsInCheckmate()) return -int.MaxValue;
+        else if (b.IsDraw()) return 0;
 
         int stand_pat = evaluate();
         if (stand_pat >= beta) return beta;
         if (alpha < stand_pat) alpha = stand_pat;
 
-        var moves = board.GetLegalMoves(true).OrderByDescending(moveOrder).ToArray();
+        var moves = b.GetLegalMoves(true).OrderByDescending(moveOrder).ToArray();
 
         foreach (Move move in moves)
         {
-            board.MakeMove(move);
+            b.MakeMove(move);
 
             int move_score = -quiesce(-beta, -alpha);
 
-            board.UndoMove(move);
+            b.UndoMove(move);
 
             if (move_score >= beta) return beta;
             if (move_score > alpha) alpha = move_score;
@@ -195,16 +197,19 @@ public class MyBot : IChessBot
         evaluations++; // #DEBUG
         int score = 0;
 
-        foreach (var pieces in board.GetAllPieceLists())
+        foreach (var pieces in b.GetAllPieceLists())
         {
             foreach (var piece in pieces)
             {
-                int value = pieceValues[(int)piece.PieceType] + pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, piece.Square.File] + 10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, board, piece.IsWhite) & BitboardHelper.GetKingAttacks(board.GetKingSquare(!piece.IsWhite)));
+                int value = 
+                    pieceValues[(int)piece.PieceType] + 
+                    pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, piece.Square.File] + 
+                    10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite) & BitboardHelper.GetKingAttacks(b.GetKingSquare(!piece.IsWhite)));
                 score += piece.IsWhite ? value : -value;
             }
         }
 
-        return score * (board.IsWhiteToMove ? 1 : -1);
+        return b.IsWhiteToMove ? score : -score;
     }
 
     int moveOrder(Move move) => pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
