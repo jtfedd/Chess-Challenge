@@ -80,7 +80,7 @@ public class MyBot : IChessBot
         
     }
 
-    int pushBonus(int col, int amount) => amount * (col) / 8;
+    int pushBonus(int col, int amount) => amount * col / 8;
 
     int centerBonus(double row, double col, int amount) => (int) (amount * (5 - Math.Sqrt(row * row + col * col)) / 5);
 
@@ -126,8 +126,8 @@ public class MyBot : IChessBot
 
     int search(int depth, int alpha, int beta, bool isTopLevel)
     {
-        cancelled = t.MillisecondsElapsedThisTurn > msToThink;
-        if (cancelled) return 0;
+        //cancelled = t.MillisecondsElapsedThisTurn > msToThink;
+        if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
 
         nodesSearched++; // #DEBUG
 
@@ -163,8 +163,8 @@ public class MyBot : IChessBot
 
     int quiesce(int alpha, int beta)
     {
-        cancelled = t.MillisecondsElapsedThisTurn > msToThink;
-        if (cancelled) return 0;
+        //cancelled = t.MillisecondsElapsedThisTurn > msToThink;
+        if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
 
         quiesenceNodes++; // #DEBUG
 
