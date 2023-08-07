@@ -21,7 +21,7 @@ using System.Runtime.InteropServices;
 //   - [ ] Pawn structure bonus
 //   - [ ] Defended/attacked pieces bonus
 
-// Token count 771
+// Token count 768
 
 public class MyBot : IChessBot
 {
@@ -126,7 +126,6 @@ public class MyBot : IChessBot
 
     int search(int depth, int alpha, int beta, bool isTopLevel)
     {
-        //cancelled = t.MillisecondsElapsedThisTurn > msToThink;
         if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
 
         nodesSearched++; // #DEBUG
@@ -163,7 +162,6 @@ public class MyBot : IChessBot
 
     int quiesce(int alpha, int beta)
     {
-        //cancelled = t.MillisecondsElapsedThisTurn > msToThink;
         if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
 
         quiesenceNodes++; // #DEBUG
