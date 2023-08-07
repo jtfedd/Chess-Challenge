@@ -67,13 +67,11 @@ public class Quiescence : IChessBot
         this.board = board;
         this.timer = timer;
 
-        Console.WriteLine($"Current evaluation {evaluate()}");
 
         // Always evaluate at depth 2
         int depth = 2;
         search(depth, -int.MaxValue, int.MaxValue, true);
         Move bestMove = searchBestMove;
-        Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}");
 
         while (!cancelled && depth < 5)
         {
@@ -84,7 +82,6 @@ public class Quiescence : IChessBot
             quiesenceNodes = 0; // #DEBUG
             search(++depth, -int.MaxValue, int.MaxValue, true);
             if (!cancelled) bestMove = searchBestMove;
-            Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
         }
 
         return bestMove;
