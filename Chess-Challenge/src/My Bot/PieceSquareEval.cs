@@ -45,7 +45,7 @@ public class PieceSquareEval : IChessBot
 
     Move searchBestMove;
 
-    public MyBot()
+    public PieceSquareEval()
     {
         tt = new TT_Entry[tt_size];
 
