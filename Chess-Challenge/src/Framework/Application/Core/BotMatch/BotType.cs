@@ -7,7 +7,7 @@ namespace ChessChallenge.BotMatch
     public class MatchBots
     {
         public static BotType A = BotType.MyBot;
-        public static BotType B = BotType.IterativeDeepening;
+        public static BotType B = BotType.Quiescence;
     }
 
     public enum BotType

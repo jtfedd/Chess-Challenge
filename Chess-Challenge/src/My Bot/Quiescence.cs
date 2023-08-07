@@ -1,8 +1,7 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Collections.Generic;
 
 // TODO
 // - Search
@@ -45,16 +44,6 @@ public class Quiescence : IChessBot
     public Quiescence()
     {
         tt = new TT_Entry[tt_size];
-    }
-
-    int pushBonus(int col, int amount) => amount * (col) / 8;
-
-    int centerBonus(double row, double col, int amount)
-    {
-        row -= 3.5;
-        col -= 3.5;
-        double dist = Math.Sqrt(row * row + col * col);
-        return (int)(amount * (5 - dist) / 5);
     }
 
     public Move Think(Board board, Timer timer)

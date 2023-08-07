@@ -47,7 +47,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="resources\Fens - Copy.txt">
+    <None Update="resources\AllFens.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="resources\Fens.txt">

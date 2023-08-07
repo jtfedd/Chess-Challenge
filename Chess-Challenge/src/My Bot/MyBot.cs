@@ -25,6 +25,7 @@ public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 320, 330, 550, 900, 10000 };
+    int[] bonusParams = { -20, -10, 10, -5, -5, 20, 50, 0, -25, 0, 0, 0, 25, 50, 50, 5, 10, -30 };
 
     Board board;
     Timer timer;
@@ -38,7 +39,7 @@ public class MyBot : IChessBot
     int nodesSearched; // #DEBUG
     int evaluations; // #DEBUG
     int cutoffs; // #DEBUG
-    int quiesenceNodes;
+    int quiesenceNodes; // #DEBUG
     int msToThink;
     bool cancelled;
 
@@ -48,64 +49,57 @@ public class MyBot : IChessBot
     {
         tt = new TT_Entry[tt_size];
 
-        pieceSquareBonuses = new int[7,8,8];
-        for (int i = 0; i < 64; i++)
+        pieceSquareBonuses = new int[6,8,8];
+        for (int i = 0; i < 384; i++)
         {
-            int row = i / 8;
+            int row = (i / 8) % 8;
             int col = i % 8;
+            int piece = i / 64;
 
             // Create piece-square tables
-            pieceSquareBonuses[1, row, col] = (row == 1 && (col < 3 || col > 4)) ? 25 : pushBonus(row, 50) + centerBonus(row, col, 25) - 20;
-            pieceSquareBonuses[2, row, col] = centerBonus(row, col, 50) - 20;
-            pieceSquareBonuses[3, row, col] = centerBonus(row, col, 30) + 10 - pushBonus(row, 25);
-            pieceSquareBonuses[4, row, col] = (row == 6 || col == 3 || col == 4) ? 5 : centerBonus(row, col, 5) - 5;
-            pieceSquareBonuses[5, row, col] = centerBonus(row, col, 10) - 5;
-            pieceSquareBonuses[6, row, col] = 20 - centerBonus(row, col, 30);
+            pieceSquareBonuses[piece, row, col] = bonusParams[piece] + pushBonus(row, bonusParams[piece+6]) + centerBonus(row - 3.5, col - 3.5, bonusParams[piece+12]);
+            if (piece == 0 && row == 1 && (col < 3 || col > 4)) pieceSquareBonuses[piece, row, col] = 25;
+            if (piece == 3 && (row == 6 || col == 3 || col == 4)) pieceSquareBonuses[piece, row, col] = 5;
         }
 
-        for (int i = 0; i < 6; i++)
-        {
-            for (int row = 7; row >= 0; row--)
-            {
-                for (int col = 0; col < 8; col++)
-                {
-                    Console.Write($"{pieceSquareBonuses[i, row, col]} ");
-                }
-                Console.WriteLine();
-            }
-            Console.WriteLine();
-        }
+        
+        for (int i = 0; i < 6; i++)// #DEBUG
+        {// #DEBUG
+            for (int row = 7; row >= 0; row--)// #DEBUG
+            {// #DEBUG
+                for (int col = 0; col < 8; col++)// #DEBUG
+                {// #DEBUG
+                    Console.Write($"{pieceSquareBonuses[i, row, col]} ");// #DEBUG
+                }// #DEBUG
+                Console.WriteLine();// #DEBUG
+            }// #DEBUG
+            Console.WriteLine();// #DEBUG
+        } // #DEBUG
+        
     }
 
     int pushBonus(int col, int amount) => amount * (col) / 8;
 
-    int centerBonus(double row, double col, int amount)
-    {
-        row -= 3.5;
-        col -= 3.5;
-        double dist = Math.Sqrt(row * row + col * col);
-        return (int) (amount * (5 - dist) / 5);
-    }
+    int centerBonus(double row, double col, int amount) => (int) (amount * (5 - Math.Sqrt(row * row + col * col)) / 5);
 
     public Move Think(Board board, Timer timer)
     {
         msToThink = timer.MillisecondsRemaining / 40;
-        //msToThink = 500;
 
         cancelled = false;
 
         this.board = board;
         this.timer = timer;
 
-        Console.WriteLine($"Current evaluation {evaluate()}");
+        Console.WriteLine($"Current evaluation {evaluate()}"); // #DEBUG
 
         // Always evaluate at depth 2
         int depth = 2;
         search(depth, -int.MaxValue, int.MaxValue, true);
         Move bestMove = searchBestMove;
-        Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}");
+        Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
 
-        while (!cancelled && depth < 5)
+        while (!cancelled)
         {
             cacheHits = 0; // #DEBUG
             nodesSearched = 0; // #DEBUG
@@ -133,7 +127,7 @@ public class MyBot : IChessBot
         cancelled = timer.MillisecondsElapsedThisTurn > msToThink;
         if (cancelled) return 0;
 
-        nodesSearched++;
+        nodesSearched++; // #DEBUG
 
         // Encourage the engine to fight to the end by making early checkmates
         // have a better score than later checkmates
@@ -170,18 +164,16 @@ public class MyBot : IChessBot
         cancelled = timer.MillisecondsElapsedThisTurn > msToThink;
         if (cancelled) return 0;
 
-        quiesenceNodes++;
+        quiesenceNodes++; // #DEBUG
 
         if (board.IsInCheckmate()) return -int.MaxValue;
         else if (board.IsDraw()) return 0;
 
         int stand_pat = evaluate();
-        if (stand_pat >= beta)
-            return beta;
-        if (alpha < stand_pat)
-            alpha = stand_pat;
+        if (stand_pat >= beta) return beta;
+        if (alpha < stand_pat) alpha = stand_pat;
 
-        Move[] moves = board.GetLegalMoves(true).OrderByDescending(moveOrder).ToArray();
+        var moves = board.GetLegalMoves(true).OrderByDescending(moveOrder).ToArray();
 
         foreach (Move move in moves)
         {
@@ -200,21 +192,14 @@ public class MyBot : IChessBot
 
     int evaluate()
     {
-        evaluations++;
+        evaluations++; // #DEBUG
         int score = 0;
 
-        foreach (PieceList pieces in board.GetAllPieceLists())
+        foreach (var pieces in board.GetAllPieceLists())
         {
-            foreach (Piece piece in pieces)
+            foreach (var piece in pieces)
             {
-                int materialValue = pieceValues[(int)piece.PieceType];
-                int bonus = pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7-piece.Square.Rank, piece.Square.File];
-                int value = materialValue + bonus;
-
-                ulong bitboard = BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, board, piece.IsWhite);
-                ulong opposingKing = BitboardHelper.GetKingAttacks(board.GetKingSquare(!piece.IsWhite));
-                int kingAttackBonus = 10 * BitboardHelper.GetNumberOfSetBits(bitboard & opposingKing);
-                value += kingAttackBonus;
+                int value = pieceValues[(int)piece.PieceType] + pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, piece.Square.File] + 10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, board, piece.IsWhite) & BitboardHelper.GetKingAttacks(board.GetKingSquare(!piece.IsWhite)));
                 score += piece.IsWhite ? value : -value;
             }
         }
@@ -222,12 +207,7 @@ public class MyBot : IChessBot
         return score * (board.IsWhiteToMove ? 1 : -1);
     }
 
-    int moveOrder(Move move)
-    {
-        int moveScore = 0;
-        if (move.CapturePieceType != PieceType.None) moveScore = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
-        return moveScore;
-    }
+    int moveOrder(Move move) => pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
 
     class TT_Entry
     {
