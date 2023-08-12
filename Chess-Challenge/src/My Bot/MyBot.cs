@@ -89,7 +89,7 @@ public class MyBot : IChessBot
             quiesenceNodes = 0; // #DEBUG
 
             bestMove = searchBestMove;
-            search(depth++, -int.MaxValue, int.MaxValue, true);
+            search(depth++, -int.MaxValue, int.MaxValue, true, false);
 
             /*
             Console.Write($"{(cancelled ? "Cancelled " : "")}{eval} {searchBestMove} - "); //#DEBUG
@@ -104,7 +104,7 @@ public class MyBot : IChessBot
             Console.WriteLine($"Transposition table is {((double)tt_full / (double)tt_size)*100}% full");
             */
 
-            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
+            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth-1} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
         }
 
         // If we didn't come up with a best move then just take the first one we can get
@@ -126,21 +126,24 @@ public class MyBot : IChessBot
     }
     */
 
-    int search(int depth, int alpha, int beta, bool isTopLevel)
+    int search(int depth, int alpha, int beta, bool isTopLevel, bool quiesce)
     {
         if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
 
-        nodesSearched++; // #DEBUG
+        if (quiesce) quiesenceNodes++; // #DEBUG
+        else nodesSearched++; // #DEBUG
 
         // Encourage the engine to fight to the end by making early checkmates
         // have a better score than later checkmates
         if (b.IsInCheckmate()) return -int.MaxValue + b.PlyCount;
         if (b.IsDraw()) return 0;
-        if (depth == 0) return quiesce(depth, alpha, beta, false);
 
-        TT_Entry entry = tt[b.ZobristKey % tt_size];
+        // If we are in quiescense then give the option to not make any captures
+        if (quiesce && (alpha = Math.Max(alpha, evaluate())) >= beta) return alpha;
+
         Move best_move = Move.NullMove;
-        if (entry?.key == b.ZobristKey && entry.depth >= depth)
+        TT_Entry entry = tt[b.ZobristKey % tt_size];
+        if (entry.key == b.ZobristKey && ((entry.depth >= depth) || quiesce))
         {
             cacheHits++; //#DEBUG
             if (entry.nodeType == 0)
@@ -162,7 +165,7 @@ public class MyBot : IChessBot
             best_move = entry.bestMove;
         }
 
-        var moves = b.GetLegalMoves().OrderByDescending(move => moveOrder(move, best_move));
+        var moves = b.GetLegalMoves(quiesce).OrderByDescending(move => moveOrder(move, best_move));
 
         best_move = Move.NullMove;
         byte node_type = 1;
@@ -170,75 +173,7 @@ public class MyBot : IChessBot
         foreach (Move move in moves)
         {
             b.MakeMove(move);
-            int move_score = -search(depth - 1, -beta, -alpha, false);
-            b.UndoMove(move);
-
-            if (move_score > alpha)
-            {
-                best_move = move;
-                if (isTopLevel) searchBestMove = move;
-                alpha = move_score;
-                node_type = 0;
-            }
-            if (alpha >= beta) {
-                cutoffs++; //#DEBUG
-                node_type = 2;
-                break;
-            }
-        }
-
-        entry = new(b.ZobristKey, depth, alpha, node_type, best_move);
-        if((tt[b.ZobristKey % tt_size]?.depth ?? -5000) <= depth) tt[b.ZobristKey % tt_size] = entry;
-
-        return alpha;
-    }
-
-    int quiesce(int depth, int alpha, int beta, bool isTopLevel)
-    {
-        if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
-
-        quiesenceNodes++; // #DEBUG
-
-        if (b.IsInCheckmate()) return -int.MaxValue;
-        else if (b.IsDraw()) return 0;
-
-        int stand_pat = evaluate();
-        if (stand_pat >= beta) return beta;
-        if (stand_pat >= alpha) alpha = stand_pat;
-
-        TT_Entry entry = tt[b.ZobristKey % tt_size];
-        Move best_move = Move.NullMove;
-        if (entry?.key == b.ZobristKey)
-        {
-            cacheHits++; //#DEBUG
-            if (entry.nodeType == 0)
-            {
-                if (isTopLevel) searchBestMove = entry.bestMove;
-                return entry.evaluation;
-            }
-            if (entry.nodeType == 1 && entry.evaluation <= alpha)
-            {
-                if (isTopLevel) searchBestMove = entry.bestMove;
-                return entry.evaluation;
-            }
-            if (entry.nodeType == 2 && entry.evaluation >= beta)
-            {
-                if (isTopLevel) searchBestMove = entry.bestMove;
-                return entry.evaluation;
-            }
-
-            best_move = entry.bestMove;
-        }
-
-        var moves = b.GetLegalMoves(true).OrderByDescending(move => moveOrder(move, best_move));
-
-        best_move = Move.NullMove;
-        byte node_type = 1;
-
-        foreach (Move move in moves)
-        {
-            b.MakeMove(move);
-            int move_score = -quiesce(depth-1, -beta, -alpha, false);
+            int move_score = -search(depth - 1, -beta, -alpha, false, depth <= 1);
             b.UndoMove(move);
 
             if (move_score > alpha)
@@ -256,7 +191,13 @@ public class MyBot : IChessBot
             }
         }
 
-        if (entry == null || entry.depth <= depth) tt[b.ZobristKey % tt_size] = new(b.ZobristKey, depth, alpha, node_type, best_move);
+        if (entry.depth <= depth) {
+            tt[b.ZobristKey % tt_size].key = b.ZobristKey;
+            tt[b.ZobristKey % tt_size].depth = depth;
+            tt[b.ZobristKey % tt_size].evaluation = alpha;
+            tt[b.ZobristKey % tt_size].nodeType = node_type;
+            tt[b.ZobristKey % tt_size].bestMove = best_move;
+            }
 
         return alpha;
     }
@@ -283,27 +224,17 @@ public class MyBot : IChessBot
 
     int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? int.MaxValue : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
 
-    class TT_Entry
+    struct TT_Entry
     {
         public ulong key;
         public int depth;
         public int evaluation;
+        public Move bestMove;
 
         // 0 - Exact
         // 1 - Upper bound
         // 2 - Lower bound
         public byte nodeType;
-
-        public Move bestMove;
-
-        public TT_Entry(ulong key, int depth, int evaluation, byte nodeType, Move bestMove)
-        {
-            this.key = key;
-            this.depth = depth;
-            this.evaluation = evaluation;
-            this.nodeType = nodeType;
-            this.bestMove = bestMove;
-        }
     }
 
     public void benchmarkSearch(Board board, int depth) // #DEBUG
@@ -311,7 +242,7 @@ public class MyBot : IChessBot
         b = board;// #DEBUG
         t = new Timer(int.MaxValue); //#DEBUG
         this.cancelled = false;// #DEBUG
-        search(depth, -int.MaxValue, int.MaxValue, true);// #DEBUG
+        search(depth, -int.MaxValue, int.MaxValue, true, false);// #DEBUG
     }// #DEBUG
 
     /*
