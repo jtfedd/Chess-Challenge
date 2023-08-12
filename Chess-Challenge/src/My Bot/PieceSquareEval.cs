@@ -62,7 +62,7 @@ public class PieceSquareEval : IChessBot
             if (piece == 3 && (row == 6 || col == 3 || col == 4)) pieceSquareBonuses[piece, row, col] = 5;
         }
 
-        
+        /*
         for (int i = 0; i < 6; i++)// #DEBUG
         {// #DEBUG
             for (int row = 7; row >= 0; row--)// #DEBUG
@@ -75,7 +75,7 @@ public class PieceSquareEval : IChessBot
             }// #DEBUG
             Console.WriteLine();// #DEBUG
         } // #DEBUG
-        
+        */
     }
 
     int pushBonus(int col, int amount) => amount * (col) / 8;
@@ -91,13 +91,13 @@ public class PieceSquareEval : IChessBot
         this.board = board;
         this.timer = timer;
 
-        Console.WriteLine($"Current evaluation {evaluate()}"); // #DEBUG
+        //Console.WriteLine($"Current evaluation {evaluate()}"); // #DEBUG
 
         // Always evaluate at depth 2
         int depth = 2;
         search(depth, -int.MaxValue, int.MaxValue, true);
         Move bestMove = searchBestMove;
-        Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
+        //Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
 
         while (!cancelled)
         {
@@ -108,7 +108,7 @@ public class PieceSquareEval : IChessBot
             quiesenceNodes = 0; // #DEBUG
             search(++depth, -int.MaxValue, int.MaxValue, true);
             if (!cancelled) bestMove = searchBestMove;
-            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
+            //Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
         }
 
         return bestMove;

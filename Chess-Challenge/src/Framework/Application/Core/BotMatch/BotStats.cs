@@ -48,7 +48,8 @@ namespace ChessChallenge.BotMatch
             }
 
             NumTimeouts += result is GameResult.WhiteTimeout or GameResult.BlackTimeout ? 1 : 0;
-            NumIllegalMoves += result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove ? 1 : 0;        }
+            NumIllegalMoves += result is GameResult.WhiteIllegalMove or GameResult.BlackIllegalMove ? 1 : 0;
+        }
 
         public void Print()
         {
@@ -59,7 +60,8 @@ namespace ChessChallenge.BotMatch
             Console.ForegroundColor = ConsoleColor.Gray;
             try
             {
-                Console.WriteLine($"Token Count: {GetTokenCount()}");
+                var (total, debug) = GetTokenCount();
+                Console.WriteLine($"Token Count - Effective: {total - debug}, Total: {total}, Debug: {debug}");
             }
             catch
             {

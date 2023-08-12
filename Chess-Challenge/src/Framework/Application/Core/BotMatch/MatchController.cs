@@ -111,7 +111,7 @@ namespace ChessChallenge.BotMatch
 
         public void OnMatchComplete()
         {
-            Console.WriteLine("Match Finished");
+            Console.WriteLine($"Finished Bot Match {matchParams.PlayerAType} vs {matchParams.PlayerBType}");
             Console.WriteLine(pgns.ToString());
             playerA.stats.Print();
             //playerB.stats.Print();

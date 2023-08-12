@@ -11,6 +11,10 @@
     "Benchmark": {
       "commandName": "Project",
       "commandLineArgs": "benchmark"
+    },
+    "Sandbox": {
+      "commandName": "Project",
+      "commandLineArgs": "sandbox"
     }
   }
 }
