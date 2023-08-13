@@ -1,17 +1,19 @@
 ﻿using ChessChallenge.API;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 
 // TODO
 // - Search
 //   - [x] Negamax
 //   - [x] Iterative deepening
-//   - [ ] Transposition table
-//   - [ ] Transposition table move ordering
+//   - [x] Transposition table
+//   - [x] Transposition table move ordering
 //   - [x] Quiescence search
-//   - [ ] Principal variation search
+//   - [x] Principal variation search
+//   - [ ] Killer moves
+//   - [ ] Delta pruning?
+//   - [ ] Horizon pruning?
 // - Evaluation
 //   - [x] Piece values
 //   - [x] Piece-square tables
@@ -30,7 +32,11 @@ public class MyBot : IChessBot
     int[] bonusParams = { -20, -10, 10, -5, -5, 20, 50, 0, -25, 0, 0, 0, 25, 50, 50, 5, 10, -30 };
 
     Board b;
+    ulong zKey => b.ZobristKey;
+
     Timer t;
+    int msToThink;
+
     ulong tt_size = 1048583;
     TT_Entry[] tt;
 
@@ -42,10 +48,10 @@ public class MyBot : IChessBot
     int evaluations; // #DEBUG
     int cutoffs; // #DEBUG
     int quiesenceNodes; // #DEBUG
-    int fullSearches;
-    int partialSearches;
-    int msToThink;
-    bool cancelled;
+    int fullSearches; // #DEBUG
+    int partialSearches; // #DEBUG
+
+    bool cancelled => t.MillisecondsElapsedThisTurn > msToThink;
 
     Move searchBestMove;
 
@@ -81,7 +87,6 @@ public class MyBot : IChessBot
         int depth = 2;
         Move bestMove = searchBestMove = Move.NullMove;
 
-        cancelled = false;
         while (!cancelled)
         {
             cacheHits = 0; // #DEBUG
@@ -89,12 +94,11 @@ public class MyBot : IChessBot
             evaluations = 0; // #DEBUG
             cutoffs = 0; // #DEBUG
             quiesenceNodes = 0; // #DEBUG
-            fullSearches = 0;
-            partialSearches = 0;
+            fullSearches = 0; // #DEBUG
+            partialSearches = 0; // #DEBUG
 
             bestMove = searchBestMove;
-            search(depth++, -int.MaxValue, int.MaxValue, true, false);
-
+            search(depth++, -100000, 100000, true);
 
             //Console.Write($"{(cancelled ? "Cancelled " : "")}{eval} {searchBestMove} - "); //#DEBUG
             //printPV(0);
@@ -109,8 +113,7 @@ public class MyBot : IChessBot
             Console.WriteLine($"Transposition table is {((double)tt_full / (double)tt_size)*100}% full");
             */
 
-
-            //Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth - 1} Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits} FS: {fullSearches} PS: {partialSearches}"); // #DEBUG
+            Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth - 1} Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits} FS: {fullSearches} PS: {partialSearches}"); // #DEBUG
         }
 
         // If we didn't come up with a best move then just take the first one we can get
@@ -118,33 +121,40 @@ public class MyBot : IChessBot
     }
     
 
-    int search(int depth, int alpha, int beta, bool isTopLevel, bool quiesce)
+    int search(int depth, int alpha, int beta, bool isTopLevel)
     {
-        beta = Math.Min(int.MaxValue - b.PlyCount, beta);
-        alpha = Math.Max(b.PlyCount - int.MaxValue, alpha);
-        if (alpha >= beta) return alpha;
-
-        if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
-
+        bool quiesce = depth <= 0;
         if (quiesce) quiesenceNodes++; // #DEBUG
         else nodesSearched++; // #DEBUG
 
+        if (cancelled) return 0;
+
         // Encourage the engine to fight to the end by making early checkmates
-        // have a better score than later checkmates
-        if (b.IsInCheckmate()) return b.PlyCount - int.MaxValue;
+        // have a better score than later checkmates.
+        if (b.IsInCheckmate()) return b.PlyCount - 100000;
+
+        // Check for draw by means other than stalemate. Stalemate will be checked when we generate moves.
         if (b.IsFiftyMoveDraw() || b.IsRepeatedPosition() || b.IsInsufficientMaterial()) return 0;
 
-        // If we are in quiescense then give the option to not make any captures
-        if (quiesce && (alpha = Math.Max(alpha, evaluate())) >= beta) return alpha;
+        // Adjust alpha and beta for the current ply of the game.
+        beta = Math.Min(100000 - b.PlyCount, beta);
+        alpha = Math.Max(b.PlyCount - 100000, alpha);
 
-        Move best_move = Move.NullMove;
-        TT_Entry entry = tt[b.ZobristKey % tt_size];
-        if (entry.key == b.ZobristKey)
+        // If we are in quiescense then adjust alpha for the possibility of not making any captures.
+        if (quiesce) alpha = Math.Max(alpha, evaluate());
+
+        // Early out if either of these conditions has caused the alpha/beta window to cut off.
+        if (alpha >= beta) return alpha;
+
+        // TODO whatever is going on here it can be simplified
+        Move bestMove = Move.NullMove;
+        TT_Entry entry = tt[zKey % tt_size];
+        if (entry.key == zKey)
         {
             cacheHits++; //#DEBUG
-            best_move = entry.bestMove;
+            bestMove = entry.bestMove;
 
-            if ((entry.depth >= depth) || quiesce)
+            if (quiesce || entry.depth >= depth)
             {
                 if (entry.nodeType == 0)
                 {
@@ -158,7 +168,7 @@ public class MyBot : IChessBot
                         if (isTopLevel) searchBestMove = entry.bestMove;
                         return entry.evaluation;
                     }
-                    else if (entry.evaluation < beta) beta = entry.evaluation;
+                    if (entry.evaluation < beta) beta = entry.evaluation;
                 }
                 if (entry.nodeType == 2)
                 {
@@ -167,65 +177,45 @@ public class MyBot : IChessBot
                         if (isTopLevel) searchBestMove = entry.bestMove;
                         return entry.evaluation;
                     }
-                    else if (entry.evaluation > alpha) alpha = entry.evaluation;
+                    if (entry.evaluation > alpha) alpha = entry.evaluation;
                 }
             }
         }
 
-        var moves = b.GetLegalMoves(quiesce).OrderByDescending(move => moveOrder(move, best_move)).ToArray();
+        // TODO this doesn't properly handle quiescence stalemate
+        var moves = b.GetLegalMoves(quiesce).OrderByDescending(move => moveOrder(move, bestMove)).ToArray();
+
+        // Check for stalemate
         if (moves.Length == 0) return quiesce ? evaluate() : 0;
 
-        best_move = Move.NullMove;
-        byte node_type = 1;
-        bool firstMove = true;
+        byte nodeType = 1; // Upper bound
 
         foreach (Move move in moves)
         {
             b.MakeMove(move);
 
-            bool needsFullSearch = firstMove;
-            firstMove = false;
-
-            int move_score = 0;
-            if (!needsFullSearch)
-            {
-                move_score = -search(depth - 1, -alpha - 1, -alpha, false, depth <= 1);
-                if (move_score > alpha && move_score < beta) needsFullSearch = true;
-            }
-            if (needsFullSearch)
-            {
-                move_score = -search(depth - 1, -beta, -alpha, false, depth <= 1);
-                fullSearches++;
-            } 
-            else
-            {
-                partialSearches++;
-            }
+            int move_score = -search(depth - 1, -alpha - 1, -alpha, false);
+            if (move_score > alpha && move_score < beta) move_score = -search(depth - 1, -beta, -alpha, false);
 
             b.UndoMove(move);
 
             if (move_score > alpha)
             {
-                best_move = move;
+                bestMove = move;
                 if (isTopLevel) searchBestMove = move;
                 alpha = move_score;
-                node_type = 0;
+                nodeType = 0; // Exact
             }
+            
             if (alpha >= beta)
             {
                 cutoffs++; //#DEBUG
-                node_type = 2;
+                nodeType = 2; // Lower bound
                 break;
             }
         }
 
-        if (!cancelled && (entry.depth <= Math.Min(depth, 0))) {
-            tt[b.ZobristKey % tt_size].key = b.ZobristKey;
-            tt[b.ZobristKey % tt_size].depth = depth;
-            tt[b.ZobristKey % tt_size].evaluation = alpha;
-            tt[b.ZobristKey % tt_size].nodeType = node_type;
-            tt[b.ZobristKey % tt_size].bestMove = best_move;
-        }
+        if (!cancelled && (entry.depth <= Math.Min(depth, 0))) tt[zKey % tt_size] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove};
 
         return alpha;
     }
@@ -250,7 +240,7 @@ public class MyBot : IChessBot
         return b.IsWhiteToMove ? score : -score;
     }
 
-    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? int.MaxValue : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
+    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? 100000 : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
 
     struct TT_Entry
     {
@@ -269,53 +259,51 @@ public class MyBot : IChessBot
     {// #DEBUG
         b = board;// #DEBUG
         t = new Timer(int.MaxValue); //#DEBUG
-        this.cancelled = false;// #DEBUG
-        this.msToThink = int.MaxValue;
+        this.msToThink = int.MaxValue; //#DEBUG
 
-        int depth = 2;
-        Move bestMove = searchBestMove = Move.NullMove;
+        int depth = 2;//#DEBUG
+        Move bestMove = searchBestMove = Move.NullMove;//#DEBUG
 
-        cancelled = false;
-        while (!cancelled && depth <= maxDepth)
-        {
+        while (!cancelled && depth <= maxDepth)//#DEBUG
+        {//#DEBUG
             cacheHits = 0; // #DEBUG
             nodesSearched = 0; // #DEBUG
             evaluations = 0; // #DEBUG
             cutoffs = 0; // #DEBUG
             quiesenceNodes = 0; // #DEBUG
-            fullSearches = 0;
-            partialSearches = 0;
+            fullSearches = 0;//#DEBUG
+            partialSearches = 0;//#DEBUG
 
-            bestMove = searchBestMove;
-            int eval = search(depth++, -int.MaxValue, int.MaxValue, true, false);
+            bestMove = searchBestMove;//#DEBUG
+            int eval = search(depth++, -100000, 100000, true);//#DEBUG
 
             Console.Write($"{depth-1} {eval} {searchBestMove} - "); //#DEBUG
-            printPV(0);
-            Console.WriteLine();
+            printPV(0);//#DEBUG
+            Console.WriteLine();//#DEBUG
 
             Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth - 1} Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits} FS: {fullSearches} PS: {partialSearches}"); // #DEBUG
-        }
+        }//#DEBUG
 
-        Console.WriteLine(bestMove);
+        Console.WriteLine(bestMove);//#DEBUG
     }// #DEBUG
 
-    void printPV(int depth)
-    {
-        if (depth > 50) return;
-        TT_Entry entry = tt[b.ZobristKey % tt_size];
-        if (entry.key != b.ZobristKey) return;
-        if (entry.bestMove == Move.NullMove) return;
+    void printPV(int depth)//#DEBUG
+    {//#DEBUG
+        if (depth > 50) return;//#DEBUG
+        TT_Entry entry = tt[b.ZobristKey % tt_size];//#DEBUG
+        if (entry.key != b.ZobristKey) return;//#DEBUG
+        if (entry.bestMove == Move.NullMove) return;//#DEBUG
 
-        Console.Write($"{entry.bestMove.StartSquare.Name}{entry.bestMove.TargetSquare.Name} ");
+        Console.Write($"{entry.bestMove.StartSquare.Name}{entry.bestMove.TargetSquare.Name} ");//#DEBUG
 
-        b.MakeMove(entry.bestMove);
-        printPV(depth+1);
-        b.UndoMove(entry.bestMove);
-    }
+        b.MakeMove(entry.bestMove);//#DEBUG
+        printPV(depth+1);//#DEBUG
+        b.UndoMove(entry.bestMove);//#DEBUG
+    }//#DEBUG
 
-    /*
-    void printPieceSquareBonuses()
-    {
+    
+    void printPieceSquareBonuses()// #DEBUG
+    {// #DEBUG
         for (int i = 0; i < 6; i++)// #DEBUG
         {// #DEBUG
             for (int row = 7; row >= 0; row--)// #DEBUG
@@ -328,6 +316,5 @@ public class MyBot : IChessBot
             }// #DEBUG
             Console.WriteLine();// #DEBUG
         } // #DEBUG
-    }
-    */
+    }// #DEBUG
 }
