@@ -50,9 +50,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="resources\AllFens.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="resources\Fens.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

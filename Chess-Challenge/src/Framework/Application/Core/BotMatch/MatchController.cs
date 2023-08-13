@@ -118,35 +118,23 @@ namespace ChessChallenge.BotMatch
 
         GameParams[] GenerateGames()
         {
-            GameParams[] games = new GameParams[matchParams.fens.Length * 2];
+            GameParams[] games = new GameParams[matchParams.numGames];
 
             playerA = new Bot(matchParams.PlayerAType, new BotStats(matchParams.PlayerAType.ToString()));
             playerB = new Bot(matchParams.PlayerBType, new BotStats(matchParams.PlayerBType.ToString()));
 
-            int i = 0;
-            for (int fenIndex = 0; fenIndex < matchParams.fens.Length; fenIndex++)
+            for (int i = 0; i < matchParams.numGames; i++)
             {
-                string fen = matchParams.fens[fenIndex];
+                int fenIndex = i / 2;
+                string fen = matchParams.fens[fenIndex % matchParams.fens.Length];
 
                 games[i] = new GameParams(
                     i+1,
                     fen,
-                    playerA,
-                    playerB,
+                    i % 2 == 0 ? playerA : playerB,
+                    i % 2 == 0 ? playerB : playerA,
                     matchParams.PlayerTimeMS
                 );
-
-                i++;
-
-                games[i] = new GameParams(
-                    i+1,
-                    fen,
-                    playerB,
-                    playerA,
-                    matchParams.PlayerTimeMS
-                );
-
-                i++;
             }
 
             return games;

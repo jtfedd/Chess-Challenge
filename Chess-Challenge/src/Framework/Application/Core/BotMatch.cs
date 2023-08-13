@@ -13,6 +13,7 @@ namespace ChessChallenge.Application
             MatchParams matchParams = new(
                 MatchBots.A,
                 MatchBots.B,
+                10,
                 startFens,
                 60 * 1000,
                 10
