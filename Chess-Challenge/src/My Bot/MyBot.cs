@@ -42,6 +42,8 @@ public class MyBot : IChessBot
     int evaluations; // #DEBUG
     int cutoffs; // #DEBUG
     int quiesenceNodes; // #DEBUG
+    int fullSearches;
+    int partialSearches;
     int msToThink;
     bool cancelled;
 
@@ -87,47 +89,41 @@ public class MyBot : IChessBot
             evaluations = 0; // #DEBUG
             cutoffs = 0; // #DEBUG
             quiesenceNodes = 0; // #DEBUG
+            fullSearches = 0;
+            partialSearches = 0;
 
             bestMove = searchBestMove;
             search(depth++, -int.MaxValue, int.MaxValue, true, false);
 
-            /*
-            Console.Write($"{(cancelled ? "Cancelled " : "")}{eval} {searchBestMove} - "); //#DEBUG
-            printPV();
-            Console.WriteLine();
 
+            //Console.Write($"{(cancelled ? "Cancelled " : "")}{eval} {searchBestMove} - "); //#DEBUG
+            //printPV(0);
+            //Console.WriteLine();
+
+            /*
             int tt_full = 0;
             for (ulong i = 0; i < tt_size; i++)
             {
-                if (tt[i] != null) tt_full++;
+                if (tt[i] ) tt_full++;
             }
             Console.WriteLine($"Transposition table is {((double)tt_full / (double)tt_size)*100}% full");
             */
 
-            Console.WriteLine($"{(cancelled ? "Cancelled":"")} {depth-1} Nodes searched: {nodesSearched} Quiecense nodes: {quiesenceNodes} evaluations: {evaluations} cutoffs: {cutoffs} cache hits: {cacheHits}"); // #DEBUG
+
+            //Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth - 1} Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits} FS: {fullSearches} PS: {partialSearches}"); // #DEBUG
         }
 
         // If we didn't come up with a best move then just take the first one we can get
         return bestMove.IsNull ? board.GetLegalMoves()[0] : bestMove;
     }
-
-    /*
-    void printPV()
-    {
-        TT_Entry entry = tt[b.ZobristKey % tt_size];
-        if (entry?.key != b.ZobristKey) return;
-        if (entry.bestMove == Move.NullMove) return;
-
-        Console.Write($"{entry.bestMove.StartSquare.Name}{entry.bestMove.TargetSquare.Name} ");
-
-        b.MakeMove(entry.bestMove);
-        printPV();
-        b.UndoMove(entry.bestMove);
-    }
-    */
+    
 
     int search(int depth, int alpha, int beta, bool isTopLevel, bool quiesce)
     {
+        beta = Math.Min(int.MaxValue - b.PlyCount, beta);
+        alpha = Math.Max(b.PlyCount - int.MaxValue, alpha);
+        if (alpha >= beta) return alpha;
+
         if (cancelled = t.MillisecondsElapsedThisTurn > msToThink) return 0;
 
         if (quiesce) quiesenceNodes++; // #DEBUG
@@ -135,7 +131,7 @@ public class MyBot : IChessBot
 
         // Encourage the engine to fight to the end by making early checkmates
         // have a better score than later checkmates
-        if (b.IsInCheckmate()) return -int.MaxValue + b.PlyCount;
+        if (b.IsInCheckmate()) return b.PlyCount - int.MaxValue;
         if (b.IsDraw()) return 0;
 
         // If we are in quiescense then give the option to not make any captures
@@ -143,37 +139,68 @@ public class MyBot : IChessBot
 
         Move best_move = Move.NullMove;
         TT_Entry entry = tt[b.ZobristKey % tt_size];
-        if (entry.key == b.ZobristKey && ((entry.depth >= depth) || quiesce))
+        if (entry.key == b.ZobristKey)
         {
             cacheHits++; //#DEBUG
-            if (entry.nodeType == 0)
-            {
-                if (isTopLevel) searchBestMove = entry.bestMove;
-                return entry.evaluation;
-            }
-            if (entry.nodeType == 1 && entry.evaluation <= alpha)
-            {
-                if (isTopLevel) searchBestMove = entry.bestMove;
-                return entry.evaluation;
-            }
-            if (entry.nodeType == 2 && entry.evaluation >= beta)
-            {
-                if (isTopLevel) searchBestMove = entry.bestMove;
-                return entry.evaluation;
-            }
-
             best_move = entry.bestMove;
+
+            if ((entry.depth >= depth) || quiesce)
+            {
+                if (entry.nodeType == 0)
+                {
+                    if (isTopLevel) searchBestMove = entry.bestMove;
+                    return entry.evaluation;
+                }
+                if (entry.nodeType == 1)
+                {
+                    if (entry.evaluation <= alpha)
+                    {
+                        if (isTopLevel) searchBestMove = entry.bestMove;
+                        return entry.evaluation;
+                    }
+                    else if (entry.evaluation < beta) beta = entry.evaluation;
+                }
+                if (entry.nodeType == 2)
+                {
+                    if (entry.evaluation >= beta)
+                    {
+                        if (isTopLevel) searchBestMove = entry.bestMove;
+                        return entry.evaluation;
+                    }
+                    else if (entry.evaluation > alpha) alpha = entry.evaluation;
+                }
+            }
         }
 
-        var moves = b.GetLegalMoves(quiesce).OrderByDescending(move => moveOrder(move, best_move));
+        var moves = b.GetLegalMoves(quiesce).OrderByDescending(move => moveOrder(move, best_move)).ToArray();
 
         best_move = Move.NullMove;
         byte node_type = 1;
+        bool firstMove = true;
 
         foreach (Move move in moves)
         {
             b.MakeMove(move);
-            int move_score = -search(depth - 1, -beta, -alpha, false, depth <= 1);
+
+            bool needsFullSearch = firstMove;
+            firstMove = false;
+
+            int move_score = 0;
+            if (!needsFullSearch)
+            {
+                move_score = -search(depth - 1, -alpha - 1, -alpha, false, depth <= 1);
+                if (move_score > alpha && move_score < beta) needsFullSearch = true;
+            }
+            if (needsFullSearch)
+            {
+                move_score = -search(depth - 1, -beta, -alpha, false, depth <= 1);
+                fullSearches++;
+            } 
+            else
+            {
+                partialSearches++;
+            }
+
             b.UndoMove(move);
 
             if (move_score > alpha)
@@ -191,13 +218,13 @@ public class MyBot : IChessBot
             }
         }
 
-        if (entry.depth <= depth) {
+        if (!cancelled && (entry.depth <= depth || entry.depth < 0)) {
             tt[b.ZobristKey % tt_size].key = b.ZobristKey;
             tt[b.ZobristKey % tt_size].depth = depth;
             tt[b.ZobristKey % tt_size].evaluation = alpha;
             tt[b.ZobristKey % tt_size].nodeType = node_type;
             tt[b.ZobristKey % tt_size].bestMove = best_move;
-            }
+        }
 
         return alpha;
     }
@@ -237,13 +264,53 @@ public class MyBot : IChessBot
         public byte nodeType;
     }
 
-    public void benchmarkSearch(Board board, int depth) // #DEBUG
+    public void benchmarkSearch(Board board, int maxDepth) // #DEBUG
     {// #DEBUG
         b = board;// #DEBUG
         t = new Timer(int.MaxValue); //#DEBUG
         this.cancelled = false;// #DEBUG
-        search(depth, -int.MaxValue, int.MaxValue, true, false);// #DEBUG
+        this.msToThink = int.MaxValue;
+
+        int depth = 2;
+        Move bestMove = searchBestMove = Move.NullMove;
+
+        cancelled = false;
+        while (!cancelled && depth <= maxDepth)
+        {
+            cacheHits = 0; // #DEBUG
+            nodesSearched = 0; // #DEBUG
+            evaluations = 0; // #DEBUG
+            cutoffs = 0; // #DEBUG
+            quiesenceNodes = 0; // #DEBUG
+            fullSearches = 0;
+            partialSearches = 0;
+
+            bestMove = searchBestMove;
+            int eval = search(depth++, -int.MaxValue, int.MaxValue, true, false);
+
+            Console.Write($"{depth-1} {eval} {searchBestMove} - "); //#DEBUG
+            printPV(0);
+            Console.WriteLine();
+
+            Console.WriteLine($"{(cancelled ? "Cancelled" : "")} {depth - 1} Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits} FS: {fullSearches} PS: {partialSearches}"); // #DEBUG
+        }
+
+        Console.WriteLine(bestMove);
     }// #DEBUG
+
+    void printPV(int depth)
+    {
+        if (depth > 50) return;
+        TT_Entry entry = tt[b.ZobristKey % tt_size];
+        if (entry.key != b.ZobristKey) return;
+        if (entry.bestMove == Move.NullMove) return;
+
+        Console.Write($"{entry.bestMove.StartSquare.Name}{entry.bestMove.TargetSquare.Name} ");
+
+        b.MakeMove(entry.bestMove);
+        printPV(depth+1);
+        b.UndoMove(entry.bestMove);
+    }
 
     /*
     void printPieceSquareBonuses()

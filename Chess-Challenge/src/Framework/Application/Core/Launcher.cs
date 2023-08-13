@@ -22,8 +22,11 @@ namespace ChessChallenge.Application
 
         static void sandbox()
         {
-            var b = Board.CreateBoardFromFEN("r2qk2r/1pp1p1pp/2nb1n2/1PpPNp2/2Bp1Bb1/3QPN2/P1P2PPP/R4RK1 w Qkq - 0 1");
+            var b = Board.CreateBoardFromFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
             Console.WriteLine(b.ZobristKey);
+
+            var bot = new MyBot();
+            bot.benchmarkSearch(b, 10);
         }
     }
 }

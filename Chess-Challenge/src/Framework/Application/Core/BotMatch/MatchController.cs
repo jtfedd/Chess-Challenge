@@ -60,7 +60,6 @@ namespace ChessChallenge.BotMatch
             }
 
             GameParams game = games[gameID];
-            Console.WriteLine($"{game.id} Starting");
 
             gameMutex.ReleaseMutex();
 
@@ -70,7 +69,6 @@ namespace ChessChallenge.BotMatch
 
         void GameThread(GameParams game)
         {
-            Console.WriteLine($"{game.id} Playing");
             GameController gameController = new GameController(game);
             gameController.Play();
 
