@@ -132,7 +132,7 @@ public class MyBot : IChessBot
         // Encourage the engine to fight to the end by making early checkmates
         // have a better score than later checkmates
         if (b.IsInCheckmate()) return b.PlyCount - int.MaxValue;
-        if (b.IsDraw()) return 0;
+        if (b.IsFiftyMoveDraw() || b.IsRepeatedPosition() || b.IsInsufficientMaterial()) return 0;
 
         // If we are in quiescense then give the option to not make any captures
         if (quiesce && (alpha = Math.Max(alpha, evaluate())) >= beta) return alpha;
@@ -173,6 +173,7 @@ public class MyBot : IChessBot
         }
 
         var moves = b.GetLegalMoves(quiesce).OrderByDescending(move => moveOrder(move, best_move)).ToArray();
+        if (moves.Length == 0) return quiesce ? evaluate() : 0;
 
         best_move = Move.NullMove;
         byte node_type = 1;
@@ -218,7 +219,7 @@ public class MyBot : IChessBot
             }
         }
 
-        if (!cancelled && (entry.depth <= depth || entry.depth < 0)) {
+        if (!cancelled && (entry.depth <= Math.Min(depth, 0))) {
             tt[b.ZobristKey % tt_size].key = b.ZobristKey;
             tt[b.ZobristKey % tt_size].depth = depth;
             tt[b.ZobristKey % tt_size].evaluation = alpha;
