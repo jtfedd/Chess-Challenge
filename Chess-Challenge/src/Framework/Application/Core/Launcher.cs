@@ -22,11 +22,15 @@ namespace ChessChallenge.Application
 
         static void sandbox()
         {
+            DateTime now = DateTime.Now;
+
             var b = Board.CreateBoardFromFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
             Console.WriteLine(b.ZobristKey);
 
             var bot = new MyBot();
-            bot.benchmarkSearch(b, 10);
+            bot.benchmarkSearch(b, 7);
+
+            Console.WriteLine(DateTime.Now - now);
         }
     }
 }
