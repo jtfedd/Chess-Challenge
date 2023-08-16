@@ -1,4 +1,5 @@
 ﻿using ChessChallenge.API;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -94,7 +95,7 @@ public class MyBot : IChessBot
             quiesenceNodes = 0; // #DEBUG
 
             bestMove = searchBestMove;
-            var eval = search(depth, -100000, 100000, true);
+            search(depth++, -100000, 100000, true);
 
             /*
             if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
@@ -102,22 +103,25 @@ public class MyBot : IChessBot
             {//#DEBUG
                 Console.WriteLine($"Depth {depth}");//#DEBUG
 
+                
                 int tt_full = 0;//#DEBUG
                 for (ulong i = 0; i < tt_size; i++)//#DEBUG
                 {//#DEBUG
                     if (tt[i].key != 0) tt_full++;//#DEBUG
                 }//#DEBUG
                 Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size)*100:0.00}% full");//#DEBUG
+                
 
                 Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
                 printPV(0);//#DEBUG
                 Console.WriteLine();//#DEBUG
 
                 Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits}"); // #DEBUG
+                
             }//#DEBUG
-            */
-
+            
             depth++;
+            */
         }
 
         // If we didn't come up with a best move then just take the first one we can get
@@ -199,7 +203,6 @@ public class MyBot : IChessBot
         if (moves.Length == 0) return quiesce ? evaluate() : 0;
 
         byte nodeType = 1; // Upper bound
-        int best_score = int.MinValue;
 
         foreach (Move move in moves)
         {
@@ -210,15 +213,10 @@ public class MyBot : IChessBot
 
             b.UndoMove(move);
 
-            if (move_score > best_score)
+            if (move_score > alpha)
             {
-                best_score = move_score;
                 bestMove = move;
                 if (isTopLevel) searchBestMove = move;
-            }
-
-            if (best_score > alpha)
-            {
                 alpha = move_score;
                 nodeType = 0; // Exact
             }
@@ -233,7 +231,7 @@ public class MyBot : IChessBot
 
         if (!cancelled && (entry.depth <= Math.Min(depth, 0))) tt[zKey % tt_size] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove};
 
-        return best_score;
+        return alpha;
     }
 
     int evaluate()
