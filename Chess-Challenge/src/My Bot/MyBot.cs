@@ -1,5 +1,4 @@
 ﻿using ChessChallenge.API;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,7 +23,7 @@ using System.Linq;
 //   - [ ] Pawn structure bonus
 //   - [ ] Defended/attacked pieces bonus
 
-// Token count 768
+// Token count 864
 
 public class MyBot : IChessBot
 {
@@ -58,7 +57,7 @@ public class MyBot : IChessBot
     {
         tt = new TT_Entry[tt_size];
 
-        pieceSquareBonuses = new int[6,8,8];
+        pieceSquareBonuses = new int[6, 8, 8];
         for (int i = 0; i < 384; i++)
         {
             int row = i / 8 % 8;
@@ -66,7 +65,7 @@ public class MyBot : IChessBot
             int piece = i / 64;
 
             // Create piece-square tables
-            pieceSquareBonuses[piece, row, col] = bonusParams[piece] + pushBonus(row, bonusParams[piece+6]) + centerBonus(row - 3.5, col - 3.5, bonusParams[piece+12]);
+            pieceSquareBonuses[piece, row, col] = bonusParams[piece] + pushBonus(row, bonusParams[piece + 6]) + centerBonus(row - 3.5, col - 3.5, bonusParams[piece + 12]);
             if (piece == 0 && row == 1 && (col < 3 || col > 4)) pieceSquareBonuses[piece, row, col] = 25;
             if (piece == 3 && (row == 6 || col == 3 || col == 4)) pieceSquareBonuses[piece, row, col] = 5;
         }
@@ -74,7 +73,7 @@ public class MyBot : IChessBot
 
     int pushBonus(int col, int amount) => amount * col / 8;
 
-    int centerBonus(double row, double col, int amount) => (int) (amount * (5 - Math.Sqrt(row * row + col * col)) / 5);
+    int centerBonus(double row, double col, int amount) => (int)(amount * (5 - Math.Sqrt(row * row + col * col)) / 5);
 
     public Move Think(Board board, Timer timer)
     {
@@ -95,39 +94,39 @@ public class MyBot : IChessBot
             quiesenceNodes = 0; // #DEBUG
 
             bestMove = searchBestMove;
-            search(depth++, -100000, 100000, true);
+            int eval = search(depth, -100000, 100000, true);
 
-            /*
+
             if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
             else//#DEBUG
             {//#DEBUG
                 Console.WriteLine($"Depth {depth}");//#DEBUG
 
-                
+
                 int tt_full = 0;//#DEBUG
                 for (ulong i = 0; i < tt_size; i++)//#DEBUG
                 {//#DEBUG
                     if (tt[i].key != 0) tt_full++;//#DEBUG
                 }//#DEBUG
-                Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size)*100:0.00}% full");//#DEBUG
-                
+                Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
+
 
                 Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
                 printPV(0);//#DEBUG
                 Console.WriteLine();//#DEBUG
 
                 Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits}"); // #DEBUG
-                
+
             }//#DEBUG
-            
+
             depth++;
-            */
+
         }
 
         // If we didn't come up with a best move then just take the first one we can get
         return bestMove.IsNull ? board.GetLegalMoves()[0] : bestMove;
     }
-    
+
 
     int search(int depth, int alpha, int beta, bool isTopLevel)
     {
@@ -153,13 +152,8 @@ public class MyBot : IChessBot
         if (quiesce) alpha = Math.Max(alpha, evaluate());
 
         // Early out if either of these conditions has caused the alpha/beta window to cut off.
-        if (alpha >= beta)
-        {
-            cutoffs++;
-            return alpha;
-        }
+        if (alpha >= beta) return alpha;
 
-        // TODO whatever is going on here it can be simplified
         Move bestMove = Move.NullMove;
         TT_Entry entry = tt[zKey % tt_size];
         if (entry.key == zKey)
@@ -168,31 +162,16 @@ public class MyBot : IChessBot
 
             if (quiesce || depth <= entry.depth)
             {
-                if (entry.nodeType == 0)
+                // exact or upper bound
+                if (entry.nodeType > 1) beta = Math.Min(entry.evaluation, beta);
+                // exact or lower bound
+                if (entry.nodeType < 3) alpha = Math.Max(entry.evaluation, alpha);
+
+                if (alpha >= beta)
                 {
                     cacheHits++; //#DEBUG
                     if (isTopLevel) searchBestMove = entry.bestMove;
                     return entry.evaluation;
-                }
-                if (entry.nodeType == 1)
-                {
-                    if (entry.evaluation <= alpha)
-                    {
-                        cacheHits++; //#DEBUG
-                        if (isTopLevel) searchBestMove = entry.bestMove;
-                        return entry.evaluation;
-                    }
-                    if (entry.evaluation < beta) beta = entry.evaluation; // I made these up, I don't know if they do anything
-                }
-                if (entry.nodeType == 2)
-                {
-                    if (entry.evaluation >= beta)
-                    {
-                        cacheHits++; //#DEBUG
-                        if (isTopLevel) searchBestMove = entry.bestMove;
-                        return entry.evaluation;
-                    }
-                    if (entry.evaluation > alpha) alpha = entry.evaluation;
                 }
             }
         }
@@ -200,15 +179,15 @@ public class MyBot : IChessBot
         var moves = b.GetLegalMoves(quiesce && !b.IsInCheck()).OrderByDescending(move => moveOrder(move, bestMove)).ToArray();
 
         // Check for stalemate
-        if (moves.Length == 0) return quiesce ? evaluate() : 0;
+        if (moves.Length == 0) return quiesce ? alpha : 0;
 
-        byte nodeType = 1; // Upper bound
+        byte nodeType = 3; // Upper bound
 
         foreach (Move move in moves)
         {
             b.MakeMove(move);
 
-            int move_score = -search(depth - 1, -alpha-1, -alpha, false);
+            int move_score = -search(depth - 1, -alpha - 1, -alpha, false);
             if (move_score > alpha && move_score < beta) move_score = -search(depth - 1, -beta, -alpha, false);
 
             b.UndoMove(move);
@@ -218,18 +197,18 @@ public class MyBot : IChessBot
                 bestMove = move;
                 if (isTopLevel) searchBestMove = move;
                 alpha = move_score;
-                nodeType = 0; // Exact
+                nodeType = 2; // Exact
             }
-            
+
             if (alpha >= beta)
             {
                 cutoffs++; //#DEBUG
-                nodeType = 2; // Lower bound
+                nodeType = 1; // Lower bound
                 break;
             }
         }
 
-        if (!cancelled && (entry.depth <= Math.Min(depth, 0))) tt[zKey % tt_size] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove};
+        if (!cancelled && (entry.depth <= Math.Min(depth, 0))) tt[zKey % tt_size] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove };
 
         return alpha;
     }
@@ -243,9 +222,9 @@ public class MyBot : IChessBot
         {
             foreach (var piece in pieces)
             {
-                int value = 
-                    pieceValues[(int)piece.PieceType] + 
-                    pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, piece.Square.File] + 
+                int value =
+                    pieceValues[(int)piece.PieceType] +
+                    pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, piece.Square.File] +
                     10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite) & BitboardHelper.GetKingAttacks(b.GetKingSquare(!piece.IsWhite)));
                 score += piece.IsWhite ? value : -value;
             }
@@ -263,9 +242,9 @@ public class MyBot : IChessBot
         public int evaluation;
         public Move bestMove;
 
-        // 0 - Exact
-        // 1 - Upper bound
-        // 2 - Lower bound
+        // 1 - Lower bound
+        // 2 - Exact
+        // 3 - Upper bound
         public byte nodeType;
     }
 
@@ -316,7 +295,7 @@ public class MyBot : IChessBot
 
     void printPV(int depth)//#DEBUG
     {//#DEBUG
-        if (depth > 50) return;//#DEBUG
+        if (depth > 10) return;//#DEBUG
         TT_Entry entry = tt[zKey % tt_size];//#DEBUG
         if (entry.key != zKey) return;//#DEBUG
         if (entry.bestMove == Move.NullMove) return;//#DEBUG
@@ -324,11 +303,11 @@ public class MyBot : IChessBot
         Console.Write($"{entry.bestMove.StartSquare.Name}{entry.bestMove.TargetSquare.Name} ");//#DEBUG
 
         b.MakeMove(entry.bestMove);//#DEBUG
-        printPV(depth+1);//#DEBUG
+        printPV(depth + 1);//#DEBUG
         b.UndoMove(entry.bestMove);//#DEBUG
     }//#DEBUG
 
-    
+
     void printPieceSquareBonuses()// #DEBUG
     {// #DEBUG
         for (int i = 0; i < 6; i++)// #DEBUG

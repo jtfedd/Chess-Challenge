@@ -17,7 +17,7 @@ namespace ChessChallenge.Application
         static void printTokens()
         {
             var (total, debug) = ChallengeController.GetTokenCount();
-            Console.WriteLine($"MyBot Tokens - Effective: {total - debug}, Total: {total}, Debug: {debug}");
+            Console.WriteLine($"MyBot Tokens - Remaining: {1024 - total + debug} Effective: {total - debug}, Total: {total}, Debug: {debug}");
         }
 
         static void sandbox()
