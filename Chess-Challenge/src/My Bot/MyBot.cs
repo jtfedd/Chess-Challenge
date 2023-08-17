@@ -14,6 +14,7 @@ using System.Linq;
 //   - [ ] Killer moves
 //   - [ ] Delta pruning?
 //   - [ ] Horizon pruning?
+//   - [ ] Late move reduction
 // - Evaluation
 //   - [x] Piece values
 //   - [x] Piece-square tables
@@ -94,9 +95,9 @@ public class MyBot : IChessBot
             quiesenceNodes = 0; // #DEBUG
 
             bestMove = searchBestMove;
-            int eval = search(depth, -100000, 100000, true);
+            search(depth++, -100000, 100000, true);
 
-
+            /*
             if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
             else//#DEBUG
             {//#DEBUG
@@ -120,7 +121,7 @@ public class MyBot : IChessBot
             }//#DEBUG
 
             depth++;
-
+            */
         }
 
         // If we didn't come up with a best move then just take the first one we can get
