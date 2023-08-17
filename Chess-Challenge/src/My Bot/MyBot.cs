@@ -44,7 +44,6 @@ public class MyBot : IChessBot
     int[,,] pieceSquareBonuses;
 
     // Debug variables
-    int cacheHits; // #DEBUG
     int nodesSearched; // #DEBUG
     int evaluations; // #DEBUG
     int cutoffs; // #DEBUG
@@ -88,7 +87,6 @@ public class MyBot : IChessBot
 
         while (!cancelled)
         {
-            cacheHits = 0; // #DEBUG
             nodesSearched = 0; // #DEBUG
             evaluations = 0; // #DEBUG
             cutoffs = 0; // #DEBUG
@@ -116,7 +114,7 @@ public class MyBot : IChessBot
                 printPV(0);//#DEBUG
                 Console.WriteLine();//#DEBUG
 
-                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits}"); // #DEBUG
+                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs}"); // #DEBUG
 
             }//#DEBUG
 
@@ -254,7 +252,6 @@ public class MyBot : IChessBot
 
         while (!cancelled && depth <= maxDepth)//#DEBUG
         {//#DEBUG
-            cacheHits = 0; // #DEBUG
             nodesSearched = 0; // #DEBUG
             evaluations = 0; // #DEBUG
             cutoffs = 0; // #DEBUG
@@ -279,7 +276,7 @@ public class MyBot : IChessBot
                 printPV(0);//#DEBUG
                 Console.WriteLine();//#DEBUG
 
-                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs} Cache: {cacheHits}"); // #DEBUG
+                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs}"); // #DEBUG
             }//#DEBUG
 
             depth++;
