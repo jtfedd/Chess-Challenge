@@ -23,6 +23,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="src\My Bot\Transposition.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Compile>
     <Compile Update="src\My Bot\PieceSquareEval.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>

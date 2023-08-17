@@ -24,7 +24,7 @@ using System.Linq;
 //   - [ ] Pawn structure bonus
 //   - [ ] Defended/attacked pieces bonus
 
-// Token count 864
+// Token count 852
 
 public class MyBot : IChessBot
 {
@@ -152,14 +152,12 @@ public class MyBot : IChessBot
         // If we are in quiescense then adjust alpha for the possibility of not making any captures.
         if (quiesce) alpha = Math.Max(alpha, evaluate());
 
-        // Early out if either of these conditions has caused the alpha/beta window to cut off.
-        if (alpha >= beta) return alpha;
-
         Move bestMove = Move.NullMove;
         TT_Entry entry = tt[zKey % tt_size];
         if (entry.key == zKey)
         {
             bestMove = entry.bestMove;
+            if (isTopLevel) searchBestMove = bestMove;
 
             if (quiesce || depth <= entry.depth)
             {
@@ -167,15 +165,11 @@ public class MyBot : IChessBot
                 if (entry.nodeType > 1) beta = Math.Min(entry.evaluation, beta);
                 // exact or lower bound
                 if (entry.nodeType < 3) alpha = Math.Max(entry.evaluation, alpha);
-
-                if (alpha >= beta)
-                {
-                    cacheHits++; //#DEBUG
-                    if (isTopLevel) searchBestMove = entry.bestMove;
-                    return entry.evaluation;
-                }
             }
         }
+
+        // Early out if any of these conditions has caused the alpha/beta window to cut off.
+        if (alpha >= beta) return alpha;
 
         var moves = b.GetLegalMoves(quiesce && !b.IsInCheck()).OrderByDescending(move => moveOrder(move, bestMove)).ToArray();
 
