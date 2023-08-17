@@ -208,7 +208,7 @@ public class MyBot : IChessBot
             }
         }
 
-        if (!cancelled && (entry.depth <= Math.Min(depth, 0))) tt[zKey % tt_size] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove };
+        if (!cancelled && (entry.depth <= Math.Max(depth, 0))) tt[zKey % tt_size] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove };
 
         return alpha;
     }
