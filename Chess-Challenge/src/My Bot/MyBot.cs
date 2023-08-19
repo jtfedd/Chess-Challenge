@@ -38,7 +38,7 @@ public class MyBot : IChessBot
     Timer t;
     int msToThink;
 
-    ulong tt_size = 1048583;
+    ulong tt_size = 1048583 * 2;
     TT_Entry[] tt;
 
     int[,,] pieceSquareBonuses;
@@ -52,13 +52,14 @@ public class MyBot : IChessBot
     bool cancelled => t.MillisecondsElapsedThisTurn > msToThink;
 
     Move searchBestMove;
+    bool endgame;
 
     public MyBot()
     {
         tt = new TT_Entry[tt_size];
         pieceSquareBonuses = new int[7, 8, 4];
         
-        for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
+        for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF);        
 
         //printPieceSquareBonuses();
     }
@@ -71,7 +72,7 @@ public class MyBot : IChessBot
         return noQueen || (noRook && minorPieceCount < 2);
     }
 
-    int getPieceSquareBonus(Piece piece, bool endgame)
+    int getPieceSquareBonus(Piece piece)
     {
         int rank = piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank;
         int file = Math.Min(piece.Square.File, 7 - piece.Square.File);
@@ -90,29 +91,41 @@ public class MyBot : IChessBot
         evaluations++; // #DEBUG
         int score = 0;
 
-        bool endgame = isSideEndgame(true) && isSideEndgame(false);
         Square wkSquare = b.GetKingSquare(true);
         Square bkSquare = b.GetKingSquare(false);
 
-        ulong whiteKingAttacks = BitboardHelper.GetKingAttacks(wkSquare);
-        ulong blackKingAttacks = BitboardHelper.GetKingAttacks(bkSquare);
+        ulong whiteKingMobility = BitboardHelper.GetKingAttacks(wkSquare) | b.GetPieceBitboard(PieceType.King, true);
+        ulong blackKingMobility = BitboardHelper.GetKingAttacks(bkSquare) | b.GetPieceBitboard(PieceType.King, false);
 
         foreach (var pieces in b.GetAllPieceLists())
         {
             foreach (var piece in pieces)
             {
                 int value = pieceValues[(int)piece.PieceType];
-                value += getPieceSquareBonus(piece, endgame);
-                value += 10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite) & (piece.IsWhite ? blackKingAttacks : whiteKingAttacks));
-                
+                ulong attacks = BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite);
+                value += getPieceSquareBonus(piece);
+                value += 10 * BitboardHelper.GetNumberOfSetBits(attacks & (piece.IsWhite ? blackKingMobility : whiteKingMobility));
+                value += 3 * BitboardHelper.GetNumberOfSetBits(attacks) / 2;
+
                 score += piece.IsWhite ? value : -value;
             }
         }
 
+        score += 10 * BitboardHelper.GetNumberOfSetBits(whiteKingMobility & b.WhitePiecesBitboard);
+        score -= 10 * BitboardHelper.GetNumberOfSetBits(blackKingMobility & b.BlackPiecesBitboard);
+
         return b.IsWhiteToMove ? score : -score;
     }
 
-    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? 100000 : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
+    int moveOrder(Move move, Move storedBest)
+    {
+        if (move.Equals(storedBest)) return 100000;
+        int score = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
+        score -= getPieceSquareBonus(new Piece(move.MovePieceType, b.IsWhiteToMove, move.StartSquare));
+        if (b.SquareIsAttackedByOpponent(move.TargetSquare)) score -= 10;
+        if (move.IsCastles) score += 50;
+        return score;
+    }
 
     public Move Think(Board board, Timer timer)
     {
@@ -132,21 +145,20 @@ public class MyBot : IChessBot
             quiesenceNodes = 0; // #DEBUG
 
             bestMove = searchBestMove;
-            search(depth++, -100000, 100000, true);
-
-            /*
+            int eval = search(depth, -100000, 100000, true);
+            
             if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
             else//#DEBUG
             {//#DEBUG
                 Console.WriteLine($"Depth {depth}");//#DEBUG
 
 
-                int tt_full = 0;//#DEBUG
-                for (ulong i = 0; i < tt_size; i++)//#DEBUG
-                {//#DEBUG
-                    if (tt[i].key != 0) tt_full++;//#DEBUG
-                }//#DEBUG
-                Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
+               // int tt_full = 0;//#DEBUG
+               // for (ulong i = 0; i < tt_size; i++)//#DEBUG
+               // {//#DEBUG
+               //     if (tt[i].key != 0) tt_full++;//#DEBUG
+               // }//#DEBUG
+               // Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
 
 
                 Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
@@ -158,7 +170,6 @@ public class MyBot : IChessBot
             }//#DEBUG
 
             depth++;
-            */
         }
 
         // If we didn't come up with a best move then just take the first one we can get
@@ -185,6 +196,8 @@ public class MyBot : IChessBot
         // Adjust alpha and beta for the current ply of the game.
         beta = Math.Min(100000 - b.PlyCount, beta);
         alpha = Math.Max(b.PlyCount - 100000, alpha);
+
+        endgame = isSideEndgame(true) && isSideEndgame(false);
 
         // If we are in quiescense then adjust alpha for the possibility of not making any captures.
         if (quiesce) alpha = Math.Max(alpha, evaluate());

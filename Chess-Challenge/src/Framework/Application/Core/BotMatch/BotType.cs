@@ -7,7 +7,7 @@ namespace ChessChallenge.BotMatch
     public class MatchBots
     {
         public static BotType A = BotType.MyBot;
-        public static BotType B = BotType.Transposition;
+        public static BotType B = BotType.EvalV1;
     }
 
     public enum BotType
@@ -18,6 +18,7 @@ namespace ChessChallenge.BotMatch
         Quiescence,
         PieceSquareEval,
         Transposition,
+        EvalV1,
 
         EvilBot,
         ExampleBot,
@@ -35,6 +36,7 @@ namespace ChessChallenge.BotMatch
                 BotType.Quiescence => MakeBot(new Quiescence()),
                 BotType.PieceSquareEval => MakeBot(new PieceSquareEval()),
                 BotType.Transposition => MakeBot(new Transposition()),
+                BotType.EvalV1 => MakeBot(new EvalV1()),
 
                 BotType.EvilBot => MakeBot(new EvilBot()),
                 BotType.ExampleBot => MakeBot(new ExampleBot()),

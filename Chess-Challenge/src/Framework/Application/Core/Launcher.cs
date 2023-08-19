@@ -11,7 +11,7 @@ namespace ChessChallenge.Application
             if (args[0] == "botmatch") BotMatch.BotMatchMain();
             if (args[0] == "program") Program.ProgramMain();
             if (args[0] == "benchmark") Benchmarks.Benchmarks.Run();
-            if (args[0] == "sandbox") testEval();
+            if (args[0] == "sandbox") searchBench();
             if (args[0] == "pvtables") PVTables.Run();
         }
 
@@ -25,7 +25,7 @@ namespace ChessChallenge.Application
         {
             DateTime now = DateTime.Now;
 
-            var b = Board.CreateBoardFromFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+            var b = Board.CreateBoardFromFEN("rn1q1rk1/pp2b1pp/3pbn2/4p3/8/1N1BBN2/PPP2PPP/R2Q1RK1 b - - 9 11");
             Console.WriteLine(b.ZobristKey);
 
             var bot = new MyBot();

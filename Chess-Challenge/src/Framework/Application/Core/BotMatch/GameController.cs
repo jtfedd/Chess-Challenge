@@ -91,7 +91,7 @@ namespace ChessChallenge.BotMatch
         Move GetBotMove()
         {
             API.Board botBoard = new(new(board));
-            API.Timer timer = new(PlayerToMove.TimeRemainingMs);
+            API.Timer timer = new(PlayerToMove.TimeRemainingMs, 0, gameParams.playerTimeMS);
             API.Move move = PlayerToMove.Bot.Think(botBoard, timer);
             return new Move(move.RawValue);
         }
