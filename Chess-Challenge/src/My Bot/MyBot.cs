@@ -200,7 +200,7 @@ public class MyBot : IChessBot
         endgame = isSideEndgame(true) && isSideEndgame(false);
 
         // If we are in quiescense then adjust alpha for the possibility of not making any captures.
-        if (quiesce) alpha = Math.Max(alpha, evaluate());
+        if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, evaluate());
 
         Move bestMove = Move.NullMove;
         TT_Entry entry = tt[zKey % tt_size];

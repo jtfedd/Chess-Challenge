@@ -25,7 +25,7 @@ namespace ChessChallenge.Application
         {
             DateTime now = DateTime.Now;
 
-            var b = Board.CreateBoardFromFEN("rn1q1rk1/pp2b1pp/3pbn2/4p3/8/1N1BBN2/PPP2PPP/R2Q1RK1 b - - 9 11");
+            var b = Board.CreateBoardFromFEN("rn1q1rk1/pp2b1pp/3pbn2/6N1/4p3/1N1BB3/PPP2PPP/R2Q1RK1 b - - 1 12");
             Console.WriteLine(b.ZobristKey);
 
             var bot = new MyBot();
