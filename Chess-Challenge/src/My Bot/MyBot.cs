@@ -63,6 +63,50 @@ public class MyBot : IChessBot
         printPieceSquareBonuses();
     }
 
+    bool isSideEndgame(bool isWhite)
+    {
+        bool noQueen = b.GetPieceBitboard(PieceType.Queen, isWhite) == 0;
+        bool noRook = b.GetPieceBitboard(PieceType.Rook, isWhite) == 0;
+        int minorPieceCount = BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite));
+        return noQueen || (noRook && minorPieceCount < 2);
+    }
+
+    int getPieceSquareBonus(Piece piece, bool endgame)
+    {
+        int rank = piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank;
+        int file = Math.Min(piece.Square.File, 7 - piece.Square.File);
+        if (piece.IsKing) return pieceSquareBonuses[endgame ? 5 : 6, rank, file];
+        return pieceSquareBonuses[(int)piece.PieceType - 1, rank, file];
+    }
+
+    int evaluate()
+    {
+        evaluations++; // #DEBUG
+        int score = 0;
+
+        bool endgame = isSideEndgame(true) && isSideEndgame(false);
+        Square wkSquare = b.GetKingSquare(true);
+        Square bkSquare = b.GetKingSquare(false);
+        ulong blackKingAttacks = BitboardHelper.GetKingAttacks(bkSquare);
+        ulong whiteKingAttacks = BitboardHelper.GetKingAttacks(wkSquare);
+
+        foreach (var pieces in b.GetAllPieceLists())
+        {
+            foreach (var piece in pieces)
+            {
+                int value = pieceValues[(int)piece.PieceType];
+                value += getPieceSquareBonus(piece, endgame);
+                value += 10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite) & (piece.IsWhite ? blackKingAttacks : whiteKingAttacks));
+                
+                score += piece.IsWhite ? value : -value;
+            }
+        }
+
+        return b.IsWhiteToMove ? score : -score;
+    }
+
+    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? 100000 : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
+
     public Move Think(Board board, Timer timer)
     {
         msToThink = timer.IncrementMilliseconds + timer.MillisecondsRemaining / 40;
@@ -193,29 +237,6 @@ public class MyBot : IChessBot
 
         return alpha;
     }
-
-    int evaluate()
-    {
-        evaluations++; // #DEBUG
-        int score = 0;
-
-        foreach (var pieces in b.GetAllPieceLists())
-        {
-            foreach (var piece in pieces)
-            {
-                int value = pieceValues[(int)piece.PieceType];
-                int pieceSquareBonus = pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, Math.Min(piece.Square.File, 7 - piece.Square.File)];
-                int attackKingBonus = 10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite) & BitboardHelper.GetKingAttacks(b.GetKingSquare(!piece.IsWhite)));
-
-                int pieceScore = value + pieceSquareBonus + attackKingBonus;
-                score += piece.IsWhite ? pieceScore : -pieceScore;
-            }
-        }
-
-        return b.IsWhiteToMove ? score : -score;
-    }
-
-    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? 100000 : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
 
     struct TT_Entry
     {
