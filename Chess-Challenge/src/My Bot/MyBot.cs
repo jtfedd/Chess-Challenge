@@ -24,13 +24,13 @@ using System.Linq;
 //   - [ ] Pawn structure bonus
 //   - [ ] Defended/attacked pieces bonus
 
-// Token count 852
+// Token count 755
 
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
-    int[] pieceValues = { 0, 100, 320, 330, 550, 900, 10000 };
-    int[] bonusParams = { -20, -10, 10, -5, -5, 20, 50, 0, -25, 0, 0, 0, 25, 50, 50, 5, 10, -30 };
+    int[] pieceValues = { 0, 100, 320, 325, 550, 975, 10000 };
+    ulong[] packedPV = { 0x32643C3732373732, 0x32643C37322D3C32, 0x3264463C32283C32, 0x3264504D4B321932, 0x000A141414140A00, 0x0A1E323732371E0A, 0x14323C41413C321E, 0x1432414646413714, 0x1E2828282828281E, 0x28323237323C3728, 0x283237373C3C320A, 0x28323C3C3C3C3228, 0x32372D2D2D2D2D32, 0x323C323232323232, 0x323C323232323237, 0x323C323232323237, 0x1E28282D3228281E, 0x2832323232373228, 0x2832373737373728, 0x2D32373737373237, 0x141414141E284646, 0x0A0A0A0A141E4650, 0x0A0A0A0A141E323C, 0x000000000A1E3232, 0x0014141414141400, 0x0A1E282828281414, 0x1428465050463214, 0x1E32505A5A503214 };
 
     Board b;
     ulong zKey => b.ZobristKey;
@@ -56,24 +56,12 @@ public class MyBot : IChessBot
     public MyBot()
     {
         tt = new TT_Entry[tt_size];
+        pieceSquareBonuses = new int[7, 8, 4];
+        
+        for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
 
-        pieceSquareBonuses = new int[6, 8, 8];
-        for (int i = 0; i < 384; i++)
-        {
-            int row = i / 8 % 8;
-            int col = i % 8;
-            int piece = i / 64;
-
-            // Create piece-square tables
-            pieceSquareBonuses[piece, row, col] = bonusParams[piece] + pushBonus(row, bonusParams[piece + 6]) + centerBonus(row - 3.5, col - 3.5, bonusParams[piece + 12]);
-            if (piece == 0 && row == 1 && (col < 3 || col > 4)) pieceSquareBonuses[piece, row, col] = 25;
-            if (piece == 3 && (row == 6 || col == 3 || col == 4)) pieceSquareBonuses[piece, row, col] = 5;
-        }
+        printPieceSquareBonuses();
     }
-
-    int pushBonus(int col, int amount) => amount * col / 8;
-
-    int centerBonus(double row, double col, int amount) => (int)(amount * (5 - Math.Sqrt(row * row + col * col)) / 5);
 
     public Move Think(Board board, Timer timer)
     {
@@ -215,11 +203,12 @@ public class MyBot : IChessBot
         {
             foreach (var piece in pieces)
             {
-                int value =
-                    pieceValues[(int)piece.PieceType] +
-                    pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, piece.Square.File] +
-                    10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite) & BitboardHelper.GetKingAttacks(b.GetKingSquare(!piece.IsWhite)));
-                score += piece.IsWhite ? value : -value;
+                int value = pieceValues[(int)piece.PieceType];
+                int pieceSquareBonus = pieceSquareBonuses[(int)piece.PieceType - 1, piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank, Math.Min(piece.Square.File, 7 - piece.Square.File)];
+                int attackKingBonus = 10 * BitboardHelper.GetNumberOfSetBits(BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite) & BitboardHelper.GetKingAttacks(b.GetKingSquare(!piece.IsWhite)));
+
+                int pieceScore = value + pieceSquareBonus + attackKingBonus;
+                score += piece.IsWhite ? pieceScore : -pieceScore;
             }
         }
 
@@ -302,13 +291,13 @@ public class MyBot : IChessBot
 
     void printPieceSquareBonuses()// #DEBUG
     {// #DEBUG
-        for (int i = 0; i < 6; i++)// #DEBUG
+        for (int i = 0; i < 7; i++)// #DEBUG
         {// #DEBUG
             for (int row = 7; row >= 0; row--)// #DEBUG
             {// #DEBUG
                 for (int col = 0; col < 8; col++)// #DEBUG
                 {// #DEBUG
-                    Console.Write($"{pieceSquareBonuses[i, row, col]} ");// #DEBUG
+                    Console.Write($"{pieceSquareBonuses[i, row, Math.Min(col, 7-col)]} ");// #DEBUG
                 }// #DEBUG
                 Console.WriteLine();// #DEBUG
             }// #DEBUG
