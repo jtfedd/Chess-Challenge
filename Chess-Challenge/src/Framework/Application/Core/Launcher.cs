@@ -11,7 +11,7 @@ namespace ChessChallenge.Application
             if (args[0] == "botmatch") BotMatch.BotMatchMain();
             if (args[0] == "program") Program.ProgramMain();
             if (args[0] == "benchmark") Benchmarks.Benchmarks.Run();
-            if (args[0] == "sandbox") sandbox();
+            if (args[0] == "sandbox") testEval();
             if (args[0] == "pvtables") PVTables.Run();
         }
 
@@ -21,7 +21,7 @@ namespace ChessChallenge.Application
             Console.WriteLine($"MyBot Tokens - Remaining: {1024 - total + debug} Effective: {total - debug}, Total: {total}, Debug: {debug}");
         }
 
-        static void sandbox()
+        static void searchBench()
         {
             DateTime now = DateTime.Now;
 
@@ -32,6 +32,14 @@ namespace ChessChallenge.Application
             bot.benchmarkSearch(b, 7);
 
             Console.WriteLine(DateTime.Now - now);
+        }
+
+        static void testEval()
+        {
+            var b = Board.CreateBoardFromFEN("3qk3/pppppppp/8/8/4K3/8/PPPPPPPP/3Q4 w - - 0 1");
+            var bot = new MyBot();
+            var eval = bot.testEval(b);
+            Console.WriteLine("Final eval: " + eval);
         }
     }
 }

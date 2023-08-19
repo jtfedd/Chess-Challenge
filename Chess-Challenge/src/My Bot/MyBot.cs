@@ -60,7 +60,7 @@ public class MyBot : IChessBot
         
         for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
 
-        printPieceSquareBonuses();
+        //printPieceSquareBonuses();
     }
 
     bool isSideEndgame(bool isWhite)
@@ -75,9 +75,15 @@ public class MyBot : IChessBot
     {
         int rank = piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank;
         int file = Math.Min(piece.Square.File, 7 - piece.Square.File);
-        if (piece.IsKing) return pieceSquareBonuses[endgame ? 5 : 6, rank, file];
+        if (piece.IsKing) return pieceSquareBonuses[endgame ? 6 : 5, rank, file];
         return pieceSquareBonuses[(int)piece.PieceType - 1, rank, file];
     }
+
+    public int testEval(Board board) // #DEBUG
+    {// #DEBUG
+        b = board;// #DEBUG
+        return evaluate();// #DEBUG
+    }// #DEBUG
 
     int evaluate()
     {
@@ -87,8 +93,9 @@ public class MyBot : IChessBot
         bool endgame = isSideEndgame(true) && isSideEndgame(false);
         Square wkSquare = b.GetKingSquare(true);
         Square bkSquare = b.GetKingSquare(false);
-        ulong blackKingAttacks = BitboardHelper.GetKingAttacks(bkSquare);
+
         ulong whiteKingAttacks = BitboardHelper.GetKingAttacks(wkSquare);
+        ulong blackKingAttacks = BitboardHelper.GetKingAttacks(bkSquare);
 
         foreach (var pieces in b.GetAllPieceLists())
         {
