@@ -11,6 +11,7 @@ using System.Linq;
 //   - [x] Transposition table move ordering
 //   - [x] Quiescence search
 //   - [x] Principal variation search
+//   - [ ] History heuristic
 //   - [ ] Killer moves
 //   - [ ] Delta pruning?
 //   - [ ] Horizon pruning?
@@ -18,8 +19,8 @@ using System.Linq;
 // - Evaluation
 //   - [x] Piece values
 //   - [x] Piece-square tables
-//   - [ ] Endgame piece-square tables
-//   - [x] Attack bonus
+//   - [x] Endgame piece-square tables
+//   - [ ] Attack bonus
 //   - [ ] Mobility bonus
 //   - [ ] Pawn structure bonus
 //   - [ ] Defended/attacked pieces bonus
@@ -38,7 +39,7 @@ public class MyBot : IChessBot
     Timer t;
     int msToThink;
 
-    ulong tt_size = 1048583 * 2;
+    ulong tt_size = 1048583;
     TT_Entry[] tt;
 
     int[,,] pieceSquareBonuses;
@@ -72,59 +73,43 @@ public class MyBot : IChessBot
         return noQueen || (noRook && minorPieceCount < 2);
     }
 
-    int getPieceSquareBonus(Piece piece)
+    int getPieceSquareBonus(int pieceType, int index, bool isWhite)
     {
-        int rank = piece.IsWhite ? piece.Square.Rank : 7 - piece.Square.Rank;
-        int file = Math.Min(piece.Square.File, 7 - piece.Square.File);
-        if (piece.IsKing) return pieceSquareBonuses[endgame ? 6 : 5, rank, file];
-        return pieceSquareBonuses[(int)piece.PieceType - 1, rank, file];
+        int rank = isWhite ? index / 8 : 7 - index / 8;
+        int file = Math.Min(index % 8, 7 - index % 8);
+        if (pieceType == 5) return pieceSquareBonuses[endgame ? 6 : 5, rank, file];
+        return pieceSquareBonuses[pieceType, rank, file];
     }
 
-    public int testEval(Board board) // #DEBUG
-    {// #DEBUG
-        b = board;// #DEBUG
-        return evaluate();// #DEBUG
-    }// #DEBUG
-
-    int evaluate()
+    int score(bool isWhite)
     {
-        evaluations++; // #DEBUG
         int score = 0;
 
-        Square wkSquare = b.GetKingSquare(true);
-        Square bkSquare = b.GetKingSquare(false);
-
-        ulong whiteKingMobility = BitboardHelper.GetKingAttacks(wkSquare) | b.GetPieceBitboard(PieceType.King, true);
-        ulong blackKingMobility = BitboardHelper.GetKingAttacks(bkSquare) | b.GetPieceBitboard(PieceType.King, false);
-
-        foreach (var pieces in b.GetAllPieceLists())
+        for (int i = 1; i < 7; i++)
         {
-            foreach (var piece in pieces)
+            var pieces = b.GetPieceBitboard((PieceType)i, isWhite);
+            score += BitboardHelper.GetNumberOfSetBits(pieces) * pieceValues[i];
+            while (pieces != 0)
             {
-                int value = pieceValues[(int)piece.PieceType];
-                ulong attacks = BitboardHelper.GetPieceAttacks(piece.PieceType, piece.Square, b, piece.IsWhite);
-                value += getPieceSquareBonus(piece);
-                value += 10 * BitboardHelper.GetNumberOfSetBits(attacks & (piece.IsWhite ? blackKingMobility : whiteKingMobility));
-                value += 3 * BitboardHelper.GetNumberOfSetBits(attacks) / 2;
-
-                score += piece.IsWhite ? value : -value;
+                var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieces);
+                score += getPieceSquareBonus(i, index, isWhite);
             }
         }
 
-        score += 10 * BitboardHelper.GetNumberOfSetBits(whiteKingMobility & b.WhitePiecesBitboard);
-        score -= 10 * BitboardHelper.GetNumberOfSetBits(blackKingMobility & b.BlackPiecesBitboard);
+        return score;
+    }
 
-        return b.IsWhiteToMove ? score : -score;
+    int evaluate(bool whiteToMove)
+    {
+        evaluations++; // #DEBUG
+
+        return score(whiteToMove) - score(!whiteToMove);
     }
 
     int moveOrder(Move move, Move storedBest)
     {
         if (move.Equals(storedBest)) return 100000;
-        int score = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
-        score -= getPieceSquareBonus(new Piece(move.MovePieceType, b.IsWhiteToMove, move.StartSquare));
-        if (b.SquareIsAttackedByOpponent(move.TargetSquare)) score -= 10;
-        if (move.IsCastles) score += 50;
-        return score;
+        return pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
     }
 
     public Move Think(Board board, Timer timer)
@@ -200,7 +185,7 @@ public class MyBot : IChessBot
         endgame = isSideEndgame(true) && isSideEndgame(false);
 
         // If we are in quiescense then adjust alpha for the possibility of not making any captures.
-        if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, evaluate());
+        if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, evaluate(b.IsWhiteToMove));
 
         Move bestMove = Move.NullMove;
         TT_Entry entry = tt[zKey % tt_size];
@@ -270,6 +255,12 @@ public class MyBot : IChessBot
         // 3 - Upper bound
         public byte nodeType;
     }
+
+    public int testEval(Board board) // #DEBUG
+    {// #DEBUG
+        b = board;// #DEBUG
+        return evaluate();// #DEBUG
+    }// #DEBUG
 
     public void benchmarkSearch(Board board, int maxDepth) // #DEBUG
     {// #DEBUG
