@@ -53,25 +53,20 @@ public class MyBot : IChessBot
     bool cancelled => t.MillisecondsElapsedThisTurn > msToThink;
 
     Move searchBestMove;
+
     bool endgame;
+    bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
     public MyBot()
     {
         tt = new TT_Entry[tt_size];
         pieceSquareBonuses = new int[7, 8, 4];
         
-        for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF);        
+        for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
 
-        //printPieceSquareBonuses();
+        printPieceSquareBonuses();
     }
 
-    bool isSideEndgame(bool isWhite)
-    {
-        bool noQueen = b.GetPieceBitboard(PieceType.Queen, isWhite) == 0;
-        bool noRook = b.GetPieceBitboard(PieceType.Rook, isWhite) == 0;
-        int minorPieceCount = BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite));
-        return noQueen || (noRook && minorPieceCount < 2);
-    }
 
     int getPieceSquareBonus(int pieceType, int index, bool isWhite)
     {
@@ -259,7 +254,7 @@ public class MyBot : IChessBot
     public int testEval(Board board) // #DEBUG
     {// #DEBUG
         b = board;// #DEBUG
-        return evaluate();// #DEBUG
+        return evaluate(b.IsWhiteToMove);// #DEBUG
     }// #DEBUG
 
     public void benchmarkSearch(Board board, int maxDepth) // #DEBUG
