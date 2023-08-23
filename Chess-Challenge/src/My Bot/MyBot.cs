@@ -64,7 +64,7 @@ public class MyBot : IChessBot
         
         for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
 
-        printPieceSquareBonuses();
+        //printPieceSquareBonuses();
     }
 
 
@@ -83,13 +83,42 @@ public class MyBot : IChessBot
         for (int i = 1; i < 7; i++)
         {
             var pieces = b.GetPieceBitboard((PieceType)i, isWhite);
-            score += BitboardHelper.GetNumberOfSetBits(pieces) * pieceValues[i];
             while (pieces != 0)
             {
+                score += pieceValues[i];
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieces);
-                score += getPieceSquareBonus(i, index, isWhite);
+                score += getPieceSquareBonus(i-1, index, isWhite);
             }
         }
+
+        ulong myPawns = b.GetPieceBitboard(PieceType.Pawn, isWhite);
+        ulong enemyPawns = b.GetPieceBitboard(PieceType.Pawn, !isWhite);
+        ulong myPawnAttacks = 0;
+
+        // We don't like doubled pawns
+        for (int i = 0; i < 8; i++) score -= 10 * Math.Max(BitboardHelper.GetNumberOfSetBits(myPawns & 0x0101010101010101ul << i) - 1, 0);
+
+        ulong pawnIter = myPawns;
+        while (pawnIter != 0)
+        {
+            var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pawnIter);
+            var pawnAttacks = BitboardHelper.GetPawnAttacks(new Square(index), isWhite);
+            myPawnAttacks |= pawnAttacks;
+
+            pawnAttacks |= 1ul << index + (isWhite ? 8 : -8);
+
+            ulong path = 0;
+            while(pawnAttacks != 0)
+            {
+                path |= pawnAttacks;
+                pawnAttacks = isWhite ? pawnAttacks << 8 : pawnAttacks >> 8;
+            }
+
+            if ((path & enemyPawns) == 0) score += 50;
+        }
+
+        // We like pawns that defend each other
+        score += 10 * BitboardHelper.GetNumberOfSetBits(myPawnAttacks & myPawns);
 
         return score;
     }
