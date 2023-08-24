@@ -12,12 +12,12 @@ using System.Linq;
 //   - [x] Quiescence search
 //   - [x] Principal variation search
 //   - [ ] History heuristic
-//   - [ ] Killer moves heuristic
 //   - [ ] Delta pruning
 //   - [ ] Checks during quiescence
 //   - [ ] Promotinus during quiescence
 //   - [ ] Late move reduction
-//   - [ ] Better time management
+//   - [ ] Killer moves
+//   - [ ] Horizon pruning?
 // - Evaluation
 //   - [x] Piece values
 //   - [x] Piece-square tables
@@ -31,7 +31,7 @@ using System.Linq;
 
 // Token count 1018
 
-public class MyBot : IChessBot
+public class EvalV3 : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 320, 325, 550, 975, 10000 };
@@ -61,7 +61,7 @@ public class MyBot : IChessBot
     bool endgame;
     bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
-    public MyBot()
+    public EvalV3()
     {
         tt = new TT_Entry[tt_size];
         pieceSquareBonuses = new int[7, 8, 4];
