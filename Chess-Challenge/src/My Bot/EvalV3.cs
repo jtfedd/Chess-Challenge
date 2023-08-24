@@ -28,7 +28,7 @@ using System.Linq;
 //   - [x] Doubled pawn deduction
 //   - [ ] Relative material advantage
 
-// Token count 1018
+// Token count 1005
 
 public class EvalV3 : IChessBot
 {
