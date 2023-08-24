@@ -1,6 +1,5 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 // TODO
@@ -48,12 +47,6 @@ public class EvalV3 : IChessBot
 
     int[,,] pieceSquareBonuses;
 
-    // Debug variables
-    int nodesSearched; // #DEBUG
-    int evaluations; // #DEBUG
-    int cutoffs; // #DEBUG
-    int quiesenceNodes; // #DEBUG
-
     bool cancelled => t.MillisecondsElapsedThisTurn > msToThink;
 
     Move searchBestMove;
@@ -67,8 +60,6 @@ public class EvalV3 : IChessBot
         pieceSquareBonuses = new int[7, 8, 4];
         
         for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
-
-        //printPieceSquareBonuses();
     }
 
 
@@ -136,12 +127,7 @@ public class EvalV3 : IChessBot
         return score;
     }
 
-    int evaluate(bool whiteToMove)
-    {
-        evaluations++; // #DEBUG
-
-        return score(whiteToMove) - score(!whiteToMove);
-    }
+    int evaluate(bool whiteToMove) => score(whiteToMove) - score(!whiteToMove);
 
     int moveOrder(Move move, Move storedBest)
     {
@@ -161,37 +147,8 @@ public class EvalV3 : IChessBot
 
         while (!cancelled)
         {
-            nodesSearched = 0; // #DEBUG
-            evaluations = 0; // #DEBUG
-            cutoffs = 0; // #DEBUG
-            quiesenceNodes = 0; // #DEBUG
-
             bestMove = searchBestMove;
-            int eval = search(depth, -100000, 100000, true);
-            
-            if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
-            else//#DEBUG
-            {//#DEBUG
-                Console.WriteLine($"Depth {depth}");//#DEBUG
-
-
-               // int tt_full = 0;//#DEBUG
-               // for (ulong i = 0; i < tt_size; i++)//#DEBUG
-               // {//#DEBUG
-               //     if (tt[i].key != 0) tt_full++;//#DEBUG
-               // }//#DEBUG
-               // Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
-
-
-                Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
-                printPV(0);//#DEBUG
-                Console.WriteLine();//#DEBUG
-
-                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs}"); // #DEBUG
-
-            }//#DEBUG
-
-            depth++;
+            search(depth++, -100000, 100000, true);
         }
 
         // If we didn't come up with a best move then just take the first one we can get
@@ -202,9 +159,6 @@ public class EvalV3 : IChessBot
     int search(int depth, int alpha, int beta, bool isTopLevel)
     {
         bool quiesce = depth <= 0;
-
-        if (quiesce) quiesenceNodes++; // #DEBUG
-        else nodesSearched++; // #DEBUG
 
         if (cancelled) return 0;
 
@@ -269,7 +223,6 @@ public class EvalV3 : IChessBot
 
             if (alpha >= beta)
             {
-                cutoffs++; //#DEBUG
                 nodeType = 1; // Lower bound
                 break;
             }
@@ -292,85 +245,4 @@ public class EvalV3 : IChessBot
         // 3 - Upper bound
         public byte nodeType;
     }
-
-    public int testEval(Board board) // #DEBUG
-    {// #DEBUG
-        b = board;// #DEBUG
-        return evaluate(b.IsWhiteToMove);// #DEBUG
-    }// #DEBUG
-
-    public void benchmarkSearch(Board board, int maxDepth) // #DEBUG
-    {// #DEBUG
-        b = board;// #DEBUG
-        t = new Timer(int.MaxValue); //#DEBUG
-        this.msToThink = int.MaxValue; //#DEBUG
-
-        int depth = 2;//#DEBUG
-        Move bestMove = searchBestMove = Move.NullMove;//#DEBUG
-
-        while (!cancelled && depth <= maxDepth)//#DEBUG
-        {//#DEBUG
-            nodesSearched = 0; // #DEBUG
-            evaluations = 0; // #DEBUG
-            cutoffs = 0; // #DEBUG
-            quiesenceNodes = 0; // #DEBUG
-
-            bestMove = searchBestMove;//#DEBUG
-            int eval = search(depth, -100000, 100000, true);//#DEBUG
-
-            if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
-            else//#DEBUG
-            {//#DEBUG
-                Console.WriteLine($"Depth {depth}");//#DEBUG
-
-                int tt_full = 0;//#DEBUG
-                for (ulong i = 0; i < tt_size; i++)//#DEBUG
-                {//#DEBUG
-                    if (tt[i].key != 0) tt_full++;//#DEBUG
-                }//#DEBUG
-                Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
-
-                Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
-                printPV(0);//#DEBUG
-                Console.WriteLine();//#DEBUG
-
-                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs}"); // #DEBUG
-            }//#DEBUG
-
-            depth++;
-        }//#DEBUG
-
-        Console.WriteLine(bestMove);//#DEBUG
-    }// #DEBUG
-
-    void printPV(int depth)//#DEBUG
-    {//#DEBUG
-        if (depth > 10) return;//#DEBUG
-        TT_Entry entry = tt[zKey % tt_size];//#DEBUG
-        if (entry.key != zKey) return;//#DEBUG
-        if (entry.bestMove == Move.NullMove) return;//#DEBUG
-
-        Console.Write($"{entry.bestMove.StartSquare.Name}{entry.bestMove.TargetSquare.Name} ");//#DEBUG
-
-        b.MakeMove(entry.bestMove);//#DEBUG
-        printPV(depth + 1);//#DEBUG
-        b.UndoMove(entry.bestMove);//#DEBUG
-    }//#DEBUG
-
-
-    void printPieceSquareBonuses()// #DEBUG
-    {// #DEBUG
-        for (int i = 0; i < 7; i++)// #DEBUG
-        {// #DEBUG
-            for (int row = 7; row >= 0; row--)// #DEBUG
-            {// #DEBUG
-                for (int col = 0; col < 8; col++)// #DEBUG
-                {// #DEBUG
-                    Console.Write($"{pieceSquareBonuses[i, row, Math.Min(col, 7-col)]} ");// #DEBUG
-                }// #DEBUG
-                Console.WriteLine();// #DEBUG
-            }// #DEBUG
-            Console.WriteLine();// #DEBUG
-        } // #DEBUG
-    }// #DEBUG
 }
