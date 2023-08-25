@@ -27,9 +27,11 @@ using System.Linq;
 //   - [x] Pawn structure bonus
 //   - [x] Passed pawn bonus
 //   - [x] Doubled pawn deduction
+//   - [ ] Isolated pawn deduction
+//   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 1018
+// Token count 1003
 
 public class MyBot : IChessBot
 {
@@ -65,20 +67,14 @@ public class MyBot : IChessBot
     {
         tt = new TT_Entry[tt_size];
         pieceSquareBonuses = new int[7, 8, 4];
-        
+
         for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
 
-        //printPieceSquareBonuses();
+        printPieceSquareBonuses(); //#DEBUG
     }
 
 
-    int getPieceSquareBonus(int pieceType, int index, bool isWhite)
-    {
-        int rank = isWhite ? index / 8 : 7 - index / 8;
-        int file = Math.Min(index % 8, 7 - index % 8);
-        if (pieceType == 5) return pieceSquareBonuses[endgame ? 6 : 5, rank, file];
-        return pieceSquareBonuses[pieceType, rank, file];
-    }
+    int getPieceSquareBonus(int pieceType, int index) => pieceSquareBonuses[(endgame && pieceType == 5) ? 6 : pieceType, index / 8, Math.Min(index % 8, 7 - index % 8)];
 
     int score(bool isWhite)
     {
@@ -102,7 +98,7 @@ public class MyBot : IChessBot
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
 
                 // Add piece value and piece square bonus
-                score += pieceValues[i] + getPieceSquareBonus(i-1, index, isWhite);
+                score += pieceValues[i] + getPieceSquareBonus(i-1, isWhite ? index : 63 - index);
 
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
                 attacks |= pieceAttacks;
@@ -161,37 +157,12 @@ public class MyBot : IChessBot
 
         while (!cancelled)
         {
-            nodesSearched = 0; // #DEBUG
-            evaluations = 0; // #DEBUG
-            cutoffs = 0; // #DEBUG
-            quiesenceNodes = 0; // #DEBUG
+            resetCounters();
 
             bestMove = searchBestMove;
-            int eval = search(depth, -100000, 100000, true);
-            
-            if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
-            else//#DEBUG
-            {//#DEBUG
-                Console.WriteLine($"Depth {depth}");//#DEBUG
+            var eval = search(depth++, -100000, 100000, true);
 
-
-               // int tt_full = 0;//#DEBUG
-               // for (ulong i = 0; i < tt_size; i++)//#DEBUG
-               // {//#DEBUG
-               //     if (tt[i].key != 0) tt_full++;//#DEBUG
-               // }//#DEBUG
-               // Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
-
-
-                Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
-                printPV(0);//#DEBUG
-                Console.WriteLine();//#DEBUG
-
-                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs}"); // #DEBUG
-
-            }//#DEBUG
-
-            depth++;
+            printMetrics(depth - 1, eval);
         }
 
         // If we didn't come up with a best move then just take the first one we can get
@@ -303,45 +274,60 @@ public class MyBot : IChessBot
     {// #DEBUG
         b = board;// #DEBUG
         t = new Timer(int.MaxValue); //#DEBUG
-        this.msToThink = int.MaxValue; //#DEBUG
+        msToThink = int.MaxValue; //#DEBUG
 
         int depth = 2;//#DEBUG
         Move bestMove = searchBestMove = Move.NullMove;//#DEBUG
 
+        var start = DateTime.Now;//#DEBUG
+
         while (!cancelled && depth <= maxDepth)//#DEBUG
         {//#DEBUG
-            nodesSearched = 0; // #DEBUG
-            evaluations = 0; // #DEBUG
-            cutoffs = 0; // #DEBUG
-            quiesenceNodes = 0; // #DEBUG
+            resetCounters(); //#DEBUG
 
             bestMove = searchBestMove;//#DEBUG
-            int eval = search(depth, -100000, 100000, true);//#DEBUG
+            int eval = search(depth++, -100000, 100000, true);//#DEBUG
 
-            if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
-            else//#DEBUG
-            {//#DEBUG
-                Console.WriteLine($"Depth {depth}");//#DEBUG
-
-                int tt_full = 0;//#DEBUG
-                for (ulong i = 0; i < tt_size; i++)//#DEBUG
-                {//#DEBUG
-                    if (tt[i].key != 0) tt_full++;//#DEBUG
-                }//#DEBUG
-                Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
-
-                Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
-                printPV(0);//#DEBUG
-                Console.WriteLine();//#DEBUG
-
-                Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs}"); // #DEBUG
-            }//#DEBUG
-
-            depth++;
+            printMetrics(depth - 1, eval); //#DEBUG
         }//#DEBUG
 
         Console.WriteLine(bestMove);//#DEBUG
+        Console.WriteLine(DateTime.Now - start);//#DEBUG
+        Console.WriteLine("Finished");//#DEBUG
     }// #DEBUG
+
+    void resetCounters()// #DEBUG
+    {// #DEBUG
+        nodesSearched = 0; // #DEBUG
+        evaluations = 0; // #DEBUG
+        cutoffs = 0; // #DEBUG
+        quiesenceNodes = 0; // #DEBUG
+    }// #DEBUG
+
+    void printMetrics(int depth, int eval)//#DEBUG
+    {//#DEBUG
+        if (cancelled) Console.WriteLine($"Cancelled at depth {depth}"); //#DEBUG
+        else//#DEBUG
+        {//#DEBUG
+            Console.WriteLine($"Depth {depth}");//#DEBUG
+
+
+            // int tt_full = 0;//#DEBUG
+            // for (ulong i = 0; i < tt_size; i++)//#DEBUG
+            // {//#DEBUG
+            //     if (tt[i].key != 0) tt_full++;//#DEBUG
+            // }//#DEBUG
+            // Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
+
+
+            Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
+            printPV(0);//#DEBUG
+            Console.WriteLine();//#DEBUG
+
+            Console.WriteLine($"Nodes: {nodesSearched} Quiesce: {quiesenceNodes} Evals: {evaluations} Cuts: {cutoffs}"); // #DEBUG
+
+        }//#DEBUG
+    }//#DEBUG
 
     void printPV(int depth)//#DEBUG
     {//#DEBUG
@@ -366,7 +352,14 @@ public class MyBot : IChessBot
             {// #DEBUG
                 for (int col = 0; col < 8; col++)// #DEBUG
                 {// #DEBUG
-                    Console.Write($"{pieceSquareBonuses[i, row, Math.Min(col, 7-col)]} ");// #DEBUG
+                    Console.Write($"{getPieceSquareBonus(i, new Square(col, row).Index)} ");// #DEBUG
+                }// #DEBUG
+
+                Console.Write("\t\t");//#DEBUG
+
+                for (int col = 0; col < 8; col++)// #DEBUG
+                {// #DEBUG
+                    Console.Write($"{getPieceSquareBonus(i, 63 - new Square(col, row).Index)} ");// #DEBUG
                 }// #DEBUG
                 Console.WriteLine();// #DEBUG
             }// #DEBUG

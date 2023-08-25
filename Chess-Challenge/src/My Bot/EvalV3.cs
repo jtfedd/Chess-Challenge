@@ -29,6 +29,7 @@ using System.Linq;
 //   - [ ] Relative material advantage
 
 // Token count 1005
+// PecanPie v1.3
 
 public class EvalV3 : IChessBot
 {
