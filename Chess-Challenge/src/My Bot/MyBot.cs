@@ -30,7 +30,7 @@ using System.Linq;
 //   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 922
+// Token count 919
 
 public class MyBot : IChessBot
 {
@@ -133,12 +133,6 @@ public class MyBot : IChessBot
         return score(whiteToMove) - score(!whiteToMove);
     }
 
-    int moveOrder(Move move, Move storedBest)
-    {
-        if (move.Equals(storedBest)) return 100000;
-        return pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
-    }
-
     public Move Think(Board board, Timer timer)
     {
         msToThink = timer.IncrementMilliseconds + timer.MillisecondsRemaining / 40;
@@ -163,6 +157,7 @@ public class MyBot : IChessBot
         return bestMove.IsNull ? board.GetLegalMoves()[0] : bestMove;
     }
 
+    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? 100000 : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
 
     int search(int depth, int alpha, int beta, bool isTopLevel)
     {
@@ -240,7 +235,7 @@ public class MyBot : IChessBot
             }
         }
 
-        if (!cancelled && (entry.depth <= Math.Max(depth, 0))) tt[zKey % 1048583] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove };
+        if (!cancelled && entry.depth <= Math.Max(depth, 0)) tt[zKey % 1048583] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove };
 
         return alpha;
     }
