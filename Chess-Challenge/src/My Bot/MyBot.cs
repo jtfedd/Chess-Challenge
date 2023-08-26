@@ -1,6 +1,5 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 // TODO
@@ -31,7 +30,7 @@ using System.Linq;
 //   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 1003
+// Token count 922
 
 public class MyBot : IChessBot
 {
@@ -45,10 +44,7 @@ public class MyBot : IChessBot
     Timer t;
     int msToThink;
 
-    ulong tt_size = 1048583;
-    TT_Entry[] tt;
-
-    int[,,] pieceSquareBonuses;
+    TT_Entry[] tt = new TT_Entry[1048583];
 
     // Debug variables
     int nodesSearched; // #DEBUG
@@ -63,18 +59,13 @@ public class MyBot : IChessBot
     bool endgame;
     bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
-    public MyBot()
-    {
-        tt = new TT_Entry[tt_size];
-        pieceSquareBonuses = new int[7, 8, 4];
-
-        for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;        
-
-        printPieceSquareBonuses(); //#DEBUG
-    }
+    public MyBot()//#DEBUG
+    {//#DEBUG
+        //printPieceSquareBonuses(); //#DEBUG
+    }//#DEBUG
 
 
-    int getPieceSquareBonus(int pieceType, int index) => pieceSquareBonuses[(endgame && pieceType == 5) ? 6 : pieceType, index / 8, Math.Min(index % 8, 7 - index % 8)];
+    int getPieceSquareBonus(int pieceType, int index) => (int)(packedPV[pieceType*4 + Math.Min(index % 8, 7 - index % 8)] >> index / 8 * 8 & 0x00000000000000FF) - 50;
 
     int score(bool isWhite)
     {
@@ -85,23 +76,19 @@ public class MyBot : IChessBot
 
         for (int i = 1; i < 7; i++)
         {
-            var pieces = b.GetPieceBitboard((PieceType)i, isWhite);
-
-            // We don't like doubled pawns
-            if (i == 1) for (int j = 0; j < 8; j++) score -= 10 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << i) - 1, 0);
-
+            ulong pieces, pieceIter;
             ulong attacks = 0;
 
-            ulong pieceIter = pieces;
+            pieces = pieceIter = b.GetPieceBitboard((PieceType)i, isWhite);
+
             while (pieceIter != 0)
             {
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
 
                 // Add piece value and piece square bonus
-                score += pieceValues[i] + getPieceSquareBonus(i-1, isWhite ? index : 63 - index);
+                score += pieceValues[i] + getPieceSquareBonus(endgame && i == 6 ? i : i - 1, isWhite ? index : 63 - index);
 
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
-                attacks |= pieceAttacks;
 
                 // Prefer piece mobility
                 score += BitboardHelper.GetNumberOfSetBits(pieceAttacks);
@@ -111,22 +98,29 @@ public class MyBot : IChessBot
 
                 if (i != 1) continue;
 
+                attacks |= pieceAttacks;
+
                 // We like passed pawns
                 pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
-                bool isPassed = true;
-                while(pieceAttacks != 0 && isPassed)
+                score += 50;
+                while (pieceAttacks != 0)
                 {
-                    isPassed = (pieceAttacks & enemyPawns) == 0;
+                    if ((pieceAttacks & enemyPawns) != 0)
+                    {
+                        score -= 50;
+                        break;
+                    }
                     pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
                 }
-
-                if (isPassed) score += 50;
             }
 
-            if (i != 1) continue;
-
-            // We like pawn chains
-            score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
+            if (i == 1)
+            {
+                // We like pawn chains
+                score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
+                // We don't like doubled pawns
+                for (int j = 0; j < 8; j++) score -= 10 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << i) - 1, 0);
+            }
         }
 
         return score;
@@ -157,12 +151,12 @@ public class MyBot : IChessBot
 
         while (!cancelled)
         {
-            resetCounters();
+            //resetCounters(); // #DEBUG
 
             bestMove = searchBestMove;
-            var eval = search(depth++, -100000, 100000, true);
+            search(depth++, -100000, 100000, true);
 
-            printMetrics(depth - 1, eval);
+            //printMetrics(depth - 1, eval); // #DEBUG
         }
 
         // If we didn't come up with a best move then just take the first one we can get
@@ -196,7 +190,7 @@ public class MyBot : IChessBot
         if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, evaluate(b.IsWhiteToMove));
 
         Move bestMove = Move.NullMove;
-        TT_Entry entry = tt[zKey % tt_size];
+        TT_Entry entry = tt[zKey % 1048583];
         if (entry.key == zKey)
         {
             bestMove = entry.bestMove;
@@ -246,7 +240,7 @@ public class MyBot : IChessBot
             }
         }
 
-        if (!cancelled && (entry.depth <= Math.Max(depth, 0))) tt[zKey % tt_size] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove };
+        if (!cancelled && (entry.depth <= Math.Max(depth, 0))) tt[zKey % 1048583] = entry with { key = zKey, depth = depth, evaluation = alpha, nodeType = nodeType, bestMove = bestMove };
 
         return alpha;
     }
@@ -313,11 +307,11 @@ public class MyBot : IChessBot
 
 
             // int tt_full = 0;//#DEBUG
-            // for (ulong i = 0; i < tt_size; i++)//#DEBUG
+            // for (ulong i = 0; i < 1048583; i++)//#DEBUG
             // {//#DEBUG
             //     if (tt[i].key != 0) tt_full++;//#DEBUG
             // }//#DEBUG
-            // Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)tt_size) * 100:0.00}% full");//#DEBUG
+            // Console.WriteLine($"Transposition table has {tt_full} entries {((double)tt_full / (double)1048583) * 100:0.00}% full");//#DEBUG
 
 
             Console.Write($"{eval} {searchBestMove} - "); //#DEBUG
@@ -332,7 +326,7 @@ public class MyBot : IChessBot
     void printPV(int depth)//#DEBUG
     {//#DEBUG
         if (depth > 10) return;//#DEBUG
-        TT_Entry entry = tt[zKey % tt_size];//#DEBUG
+        TT_Entry entry = tt[zKey % 1048583];//#DEBUG
         if (entry.key != zKey) return;//#DEBUG
         if (entry.bestMove == Move.NullMove) return;//#DEBUG
 

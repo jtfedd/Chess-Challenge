@@ -11,10 +11,11 @@ namespace ChessChallenge.Benchmarks
     {
         public static void Run()
         {
-            string[] fens = FileHelper.ReadResourceFile("AllFens.txt").Split('\n').Where(fen => fen.Length > 0).ToArray();
+            string[] fens = FileHelper.ReadResourceFile("Fens.txt").Split('\n').Where(fen => fen.Length > 0).ToArray();
 
             Parallel.Invoke(
-                () => benchmark("Search", fens, 10, benchmarkSearch)
+                //() => benchmark("Search", fens, 10, benchmarkSearch),
+                () => benchmark("Evaluate", fens, 10, benchmarkEvaluate)
             );
         }
 
@@ -24,6 +25,15 @@ namespace ChessChallenge.Benchmarks
             MyBot myBot = new MyBot();
             var start = DateTime.Now;
             myBot.benchmarkSearch(board, 2);
+            return (DateTime.Now - start).TotalSeconds;
+        }
+
+        static double benchmarkEvaluate(string fen)
+        {
+            Board board = Board.CreateBoardFromFEN(fen);
+            MyBot myBot = new MyBot();
+            var start = DateTime.Now;
+            myBot.testEval(board);
             return (DateTime.Now - start).TotalSeconds;
         }
 
