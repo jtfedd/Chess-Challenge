@@ -119,7 +119,7 @@ public class MyBot : IChessBot
                 // We like pawn chains
                 score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
                 // We don't like doubled pawns
-                for (int j = 0; j < 8; j++) score -= 10 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << i) - 1, 0);
+                for (int j = 0; j < 8; j++) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j) - 1, 0);
             }
         }
 
@@ -355,4 +355,6 @@ public class MyBot : IChessBot
             Console.WriteLine();// #DEBUG
         } // #DEBUG
     }// #DEBUG
+
+    //int getPieceSquareBonus(int pieceType, int pieceSquareIndex) => (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;// #DEBUG
 }
