@@ -30,7 +30,7 @@ using System.Linq;
 //   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 919
+// Token count 910
 
 public class MyBot : IChessBot
 {
@@ -64,9 +64,6 @@ public class MyBot : IChessBot
         //printPieceSquareBonuses(); //#DEBUG
     }//#DEBUG
 
-
-    int getPieceSquareBonus(int pieceType, int index) => (int)(packedPV[pieceType*4 + Math.Min(index % 8, 7 - index % 8)] >> index / 8 * 8 & 0x00000000000000FF) - 50;
-
     int score(bool isWhite)
     {
         int score = 0;
@@ -74,7 +71,8 @@ public class MyBot : IChessBot
         var enemyKing = BitboardHelper.GetKingAttacks(b.GetKingSquare(!isWhite));
         var enemyPawns = b.GetPieceBitboard(PieceType.Pawn, !isWhite);
 
-        for (int i = 1; i < 7; i++)
+        int i = 0;
+        while(++i < 7)
         {
             ulong pieces, pieceIter;
             ulong attacks = 0;
@@ -84,11 +82,11 @@ public class MyBot : IChessBot
             while (pieceIter != 0)
             {
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
+                var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
 
                 // Add piece value and piece square bonus
-                score += pieceValues[i] + getPieceSquareBonus(endgame && i == 6 ? i : i - 1, isWhite ? index : 63 - index);
-
-                var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
+                var pieceSquareIndex = isWhite ? index : 63 - index;
+                score += pieceValues[i] + (int)(packedPV[(endgame && i == 6 ? i : i - 1) * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;
 
                 // Prefer piece mobility
                 score += BitboardHelper.GetNumberOfSetBits(pieceAttacks);
@@ -119,7 +117,8 @@ public class MyBot : IChessBot
                 // We like pawn chains
                 score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
                 // We don't like doubled pawns
-                for (int j = 0; j < 8; j++) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j) - 1, 0);
+                int j = 0;
+                while(j < 8) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j++) - 1, 0);
             }
         }
 
@@ -356,5 +355,5 @@ public class MyBot : IChessBot
         } // #DEBUG
     }// #DEBUG
 
-    //int getPieceSquareBonus(int pieceType, int pieceSquareIndex) => (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;// #DEBUG
+    int getPieceSquareBonus(int pieceType, int pieceSquareIndex) => (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;// #DEBUG
 }
