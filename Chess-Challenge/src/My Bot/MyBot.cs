@@ -26,11 +26,13 @@ using System.Linq;
 //   - [x] Pawn structure bonus
 //   - [x] Passed pawn bonus
 //   - [x] Doubled pawn deduction
+//   - [ ] Bishop pair bonus
+//   - [ ] Bishop endgame bonus
 //   - [ ] Isolated pawn deduction
 //   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 910
+// Token count 908
 
 public class MyBot : IChessBot
 {
@@ -100,16 +102,8 @@ public class MyBot : IChessBot
 
                 // We like passed pawns
                 pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
-                score += 50;
-                while (pieceAttacks != 0)
-                {
-                    if ((pieceAttacks & enemyPawns) != 0)
-                    {
-                        score -= 50;
-                        break;
-                    }
-                    pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
-                }
+                while(pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
+                if (pieceAttacks == 0) score += 50;
             }
 
             if (i == 1)
@@ -128,7 +122,7 @@ public class MyBot : IChessBot
     int evaluate(bool whiteToMove)
     {
         evaluations++; // #DEBUG
-
+        endgame = isSideEndgame(true) && isSideEndgame(false);
         return score(whiteToMove) - score(!whiteToMove);
     }
 
@@ -177,8 +171,6 @@ public class MyBot : IChessBot
         // Adjust alpha and beta for the current ply of the game.
         beta = Math.Min(100000 - b.PlyCount, beta);
         alpha = Math.Max(b.PlyCount - 100000, alpha);
-
-        endgame = isSideEndgame(true) && isSideEndgame(false);
 
         // If we are in quiescense then adjust alpha for the possibility of not making any captures.
         if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, evaluate(b.IsWhiteToMove));
