@@ -87,8 +87,7 @@ public class MyBot : IChessBot
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
 
                 // Add piece value and piece square bonus
-                var pieceSquareIndex = isWhite ? index : 63 - index;
-                score += pieceValues[i] + (int)(packedPV[(endgame && i == 6 ? i : i - 1) * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;
+                score += pieceValues[i] + getPieceSquareBonus(i-1, index, isWhite);
 
                 // Prefer piece mobility
                 score += BitboardHelper.GetNumberOfSetBits(pieceAttacks);
@@ -150,10 +149,86 @@ public class MyBot : IChessBot
         return bestMove.IsNull ? board.GetLegalMoves()[0] : bestMove;
     }
 
-    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? 100000 : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
+    const int million = 1000000;
+    const int hashMoveScore = 100 * million;
+    const int winningCaptureBias = 8 * million;
+    const int promoteBias = 6 * million;
+    const int killerBias = 4 * million;
+    const int losingCaptureBias = 2 * million;
+    const int regularBias = 0;
+
+    Killers[] killerMoves = new Killers[50];
+    int[,,] history;
+
+    int getPieceSquareBonus(int pieceType, int index, bool isWhite)
+    {
+        int pieceSquareIndex = isWhite ? index : 63 - index;
+        return (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;
+    }
+
+    int moveOrder(Move move, Move hashMove)
+    {
+        if (move.Equals(hashMove)) return hashMoveScore;
+
+        int score = 0;
+
+        if (move.IsCapture)
+        {
+            int delta = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
+            score += (delta >= 0 || !b.SquareIsAttackedByOpponent(move.TargetSquare) ? winningCaptureBias : losingCaptureBias) + delta;
+        }
+        else
+        {
+            bool isKiller = b.PlyCount < 50 && killerMoves[b.PlyCount].Match(move);
+            score += isKiller ? killerBias : regularBias;
+            score += history[b.IsWhiteToMove ? 0 : 1, move.StartSquare.Index, move.TargetSquare.Index];
+        }
+
+        if (move.IsPromotion) score += promoteBias;
+        else if (move.MovePieceType != PieceType.King)
+        {
+            int pieceType = (int)move.MovePieceType - 1;
+            int toScore = getPieceSquareBonus(pieceType, move.TargetSquare.Index, b.IsWhiteToMove);
+            int fromScore = getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
+            score += toScore - fromScore;
+
+            /*
+            if (BitBoardUtility.ContainsSquare(oppPawnAttacks, targetSquare))
+            {
+                score -= 50;
+            }
+            else if (BitBoardUtility.ContainsSquare(oppAttacks, targetSquare))
+            {
+                score -= 25;
+            }
+            */
+        }
+
+        return score;
+    }
+
+    public struct Killers
+    {
+        public Move moveA;
+        public Move moveB;
+
+        public void Add(Move move)
+        {
+            if (!move.Equals(moveA))
+            {
+                moveB = moveA;
+                moveA = move;
+            }
+        }
+
+        public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
+
+    }
 
     int search(int depth, int alpha, int beta, bool isTopLevel)
     {
+        // TODO move to Think
+        if (isTopLevel) history = new int[2, 64, 64];
         bool quiesce = depth <= 0;
 
         if (quiesce) quiesenceNodes++; // #DEBUG
@@ -173,7 +248,8 @@ public class MyBot : IChessBot
         alpha = Math.Max(b.PlyCount - 100000, alpha);
 
         // If we are in quiescense then adjust alpha for the possibility of not making any captures.
-        if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, evaluate(b.IsWhiteToMove));
+        int eval = 0;
+        if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, eval = evaluate(b.IsWhiteToMove));
 
         Move bestMove = Move.NullMove;
         TT_Entry entry = tt[zKey % 1048583];
@@ -203,6 +279,8 @@ public class MyBot : IChessBot
 
         foreach (Move move in moves)
         {
+            //if (quiesce && !b.IsInCheck() && eval + pieceValues[(int)move.CapturePieceType] < alpha - 200) continue;
+
             b.MakeMove(move);
 
             int move_score = -search(depth - 1, -alpha - 1, -alpha, false);
@@ -221,6 +299,11 @@ public class MyBot : IChessBot
             if (alpha >= beta)
             {
                 cutoffs++; //#DEBUG
+                if (!move.IsCapture && b.PlyCount < 50)
+                {
+                    killerMoves[b.PlyCount].Add(move);
+                    history[b.IsWhiteToMove ? 0 : 1, move.StartSquare.Index, move.TargetSquare.Index] += depth * depth;
+                }
                 nodeType = 1; // Lower bound
                 break;
             }
@@ -332,20 +415,18 @@ public class MyBot : IChessBot
             {// #DEBUG
                 for (int col = 0; col < 8; col++)// #DEBUG
                 {// #DEBUG
-                    Console.Write($"{getPieceSquareBonus(i, new Square(col, row).Index)} ");// #DEBUG
+                    Console.Write($"{getPieceSquareBonus(i, new Square(col, row).Index, true)} ");// #DEBUG
                 }// #DEBUG
 
                 Console.Write("\t\t");//#DEBUG
 
                 for (int col = 0; col < 8; col++)// #DEBUG
                 {// #DEBUG
-                    Console.Write($"{getPieceSquareBonus(i, 63 - new Square(col, row).Index)} ");// #DEBUG
+                    Console.Write($"{getPieceSquareBonus(i, new Square(col, row).Index, false)} ");// #DEBUG
                 }// #DEBUG
                 Console.WriteLine();// #DEBUG
             }// #DEBUG
             Console.WriteLine();// #DEBUG
         } // #DEBUG
     }// #DEBUG
-
-    int getPieceSquareBonus(int pieceType, int pieceSquareIndex) => (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;// #DEBUG
 }

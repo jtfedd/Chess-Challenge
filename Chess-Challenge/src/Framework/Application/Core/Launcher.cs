@@ -11,7 +11,7 @@ namespace ChessChallenge.Application
             if (args[0] == "botmatch") BotMatch.BotMatchMain();
             if (args[0] == "program") Program.ProgramMain();
             if (args[0] == "benchmark") Benchmarks.Benchmarks.Run();
-            if (args[0] == "sandbox") testEval();
+            if (args[0] == "sandbox") testSearch();
             if (args[0] == "pvtables") PVTables.Run();
         }
 
@@ -21,7 +21,7 @@ namespace ChessChallenge.Application
             Console.WriteLine($"MyBot Tokens - Remaining: {1024 - total + debug} Effective: {total - debug}, Total: {total}, Debug: {debug}");
         }
 
-        static void searchBench()
+        static void testSearch()
         {
             DateTime now = DateTime.Now;
 
