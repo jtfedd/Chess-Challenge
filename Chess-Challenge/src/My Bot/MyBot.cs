@@ -10,8 +10,8 @@ using System.Linq;
 //   - [x] Transposition table move ordering
 //   - [x] Quiescence search
 //   - [x] Principal variation search
-//   - [ ] History heuristic
-//   - [ ] Killer moves heuristic
+//   - [x] History heuristic
+//   - [x] Killer moves heuristic
 //   - [ ] Delta pruning
 //   - [ ] Checks during quiescence
 //   - [ ] Promotinus during quiescence
@@ -48,6 +48,9 @@ public class MyBot : IChessBot
 
     TT_Entry[] tt = new TT_Entry[1048583];
 
+    Killers[] killerMoves = new Killers[50];
+    int[,,] history;
+
     // Debug variables
     int nodesSearched; // #DEBUG
     int evaluations; // #DEBUG
@@ -74,7 +77,7 @@ public class MyBot : IChessBot
         var enemyPawns = b.GetPieceBitboard(PieceType.Pawn, !isWhite);
 
         int i = 0;
-        while(++i < 7)
+        while (++i < 7)
         {
             ulong pieces, pieceIter;
             ulong attacks = 0;
@@ -87,7 +90,7 @@ public class MyBot : IChessBot
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
 
                 // Add piece value and piece square bonus
-                score += pieceValues[i] + getPieceSquareBonus(i-1, index, isWhite);
+                score += pieceValues[i] + getPieceSquareBonus(endgame && i == 6 ? i : i - 1, index, isWhite);
 
                 // Prefer piece mobility
                 score += BitboardHelper.GetNumberOfSetBits(pieceAttacks);
@@ -101,7 +104,7 @@ public class MyBot : IChessBot
 
                 // We like passed pawns
                 pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
-                while(pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
+                while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
                 if (pieceAttacks == 0) score += 50;
             }
 
@@ -111,7 +114,7 @@ public class MyBot : IChessBot
                 score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
                 // We don't like doubled pawns
                 int j = 0;
-                while(j < 8) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j++) - 1, 0);
+                while (j < 8) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j++) - 1, 0);
             }
         }
 
@@ -150,17 +153,6 @@ public class MyBot : IChessBot
         return bestMove.IsNull ? board.GetLegalMoves()[0] : bestMove;
     }
 
-    const int million = 1000000;
-    const int hashMoveScore = 100 * million;
-    const int winningCaptureBias = 8 * million;
-    const int promoteBias = 6 * million;
-    const int killerBias = 4 * million;
-    const int losingCaptureBias = 2 * million;
-    const int regularBias = 0;
-
-    Killers[] killerMoves = new Killers[50];
-    int[,,] history;
-
     int getPieceSquareBonus(int pieceType, int index, bool isWhite)
     {
         int pieceSquareIndex = isWhite ? index : 63 - index;
@@ -169,40 +161,26 @@ public class MyBot : IChessBot
 
     int moveOrder(Move move, Move hashMove)
     {
-        if (move.Equals(hashMove)) return hashMoveScore;
+        if (move.Equals(hashMove)) return 100000000;
 
         int score = 0;
 
         if (move.IsCapture)
         {
             int delta = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
-            score += (delta >= 0 || !b.SquareIsAttackedByOpponent(move.TargetSquare) ? winningCaptureBias : losingCaptureBias) + delta;
+            score += (delta >= 0 || !b.SquareIsAttackedByOpponent(move.TargetSquare) ? 8000000 : 2000000) + delta;
         }
         else
         {
-            bool isKiller = b.PlyCount < 50 && killerMoves[b.PlyCount].Match(move);
-            score += isKiller ? killerBias : regularBias;
+            if (b.PlyCount < 50 && killerMoves[b.PlyCount].Match(move)) score += 4000000;
             score += history[b.IsWhiteToMove ? 0 : 1, move.StartSquare.Index, move.TargetSquare.Index];
         }
 
-        if (move.IsPromotion) score += promoteBias;
+        if (move.IsPromotion) score += 6000000;
         else if (move.MovePieceType != PieceType.King)
         {
             int pieceType = (int)move.MovePieceType - 1;
-            int toScore = getPieceSquareBonus(pieceType, move.TargetSquare.Index, b.IsWhiteToMove);
-            int fromScore = getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
-            score += toScore - fromScore;
-
-            /*
-            if (BitBoardUtility.ContainsSquare(oppPawnAttacks, targetSquare))
-            {
-                score -= 50;
-            }
-            else if (BitBoardUtility.ContainsSquare(oppAttacks, targetSquare))
-            {
-                score -= 25;
-            }
-            */
+            score += getPieceSquareBonus((int)move.MovePieceType - 1, move.TargetSquare.Index, b.IsWhiteToMove) - getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
         }
 
         return score;
@@ -210,8 +188,7 @@ public class MyBot : IChessBot
 
     public struct Killers
     {
-        public Move moveA;
-        public Move moveB;
+        Move moveA, moveB;
 
         public void Add(Move move)
         {
@@ -223,7 +200,6 @@ public class MyBot : IChessBot
         }
 
         public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
-
     }
 
     int search(int depth, int alpha, int beta, bool isTopLevel = false)

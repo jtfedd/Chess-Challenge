@@ -10,8 +10,8 @@ using System.Linq;
 //   - [x] Transposition table move ordering
 //   - [x] Quiescence search
 //   - [x] Principal variation search
-//   - [ ] History heuristic
-//   - [ ] Killer moves heuristic
+//   - [x] History heuristic
+//   - [x] Killer moves heuristic
 //   - [ ] Delta pruning
 //   - [ ] Checks during quiescence
 //   - [ ] Promotinus during quiescence
@@ -171,6 +171,8 @@ public class HeftyBot : IChessBot
     {
         if (move.Equals(hashMove)) return hashMoveScore;
 
+        ulong oppPawns = b.GetPieceBitboard(PieceType.Pawn, !b.IsWhiteToMove);
+
         int score = 0;
 
         if (move.IsCapture)
@@ -193,16 +195,9 @@ public class HeftyBot : IChessBot
             int fromScore = getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
             score += toScore - fromScore;
 
-            /*
-            if (BitBoardUtility.ContainsSquare(oppPawnAttacks, targetSquare))
-            {
-                score -= 50;
-            }
-            else if (BitBoardUtility.ContainsSquare(oppAttacks, targetSquare))
-            {
-                score -= 25;
-            }
-            */
+            
+            if ((BitboardHelper.GetPawnAttacks(move.TargetSquare, b.IsWhiteToMove) & oppPawns) != 0) score -= 50;
+            else if (b.SquareIsAttackedByOpponent(move.TargetSquare)) score -= 25;
         }
 
         return score;
