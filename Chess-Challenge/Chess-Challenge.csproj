@@ -29,6 +29,9 @@
     <Compile Update="src\My Bot\EvalV3.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>
+    <Compile Update="src\My Bot\HeftyBot.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Compile>
     <Compile Update="src\My Bot\Transposition.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>

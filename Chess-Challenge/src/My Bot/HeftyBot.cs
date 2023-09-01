@@ -34,7 +34,7 @@ using System.Linq;
 
 // Token count 908
 
-public class MyBot : IChessBot
+public class HeftyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 320, 325, 550, 975, 10000 };
@@ -61,7 +61,7 @@ public class MyBot : IChessBot
     bool endgame;
     bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
-    public MyBot()//#DEBUG
+    public HeftyBot()//#DEBUG
     {//#DEBUG
         //printPieceSquareBonuses(); //#DEBUG
     }//#DEBUG
@@ -74,7 +74,7 @@ public class MyBot : IChessBot
         var enemyPawns = b.GetPieceBitboard(PieceType.Pawn, !isWhite);
 
         int i = 0;
-        while(++i < 7)
+        while (++i < 7)
         {
             ulong pieces, pieceIter;
             ulong attacks = 0;
@@ -87,7 +87,7 @@ public class MyBot : IChessBot
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
 
                 // Add piece value and piece square bonus
-                score += pieceValues[i] + getPieceSquareBonus(i-1, index, isWhite);
+                score += pieceValues[i] + getPieceSquareBonus(i - 1, index, isWhite);
 
                 // Prefer piece mobility
                 score += BitboardHelper.GetNumberOfSetBits(pieceAttacks);
@@ -101,7 +101,7 @@ public class MyBot : IChessBot
 
                 // We like passed pawns
                 pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
-                while(pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
+                while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
                 if (pieceAttacks == 0) score += 50;
             }
 
@@ -111,7 +111,7 @@ public class MyBot : IChessBot
                 score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
                 // We don't like doubled pawns
                 int j = 0;
-                while(j < 8) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j++) - 1, 0);
+                while (j < 8) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j++) - 1, 0);
             }
         }
 
