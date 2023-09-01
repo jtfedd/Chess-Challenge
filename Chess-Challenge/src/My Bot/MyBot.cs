@@ -16,7 +16,7 @@ using System.Linq;
 //   - [ ] Checks during quiescence
 //   - [ ] Promotinus during quiescence
 //   - [ ] Late move reduction
-//   - [ ] Better time management
+//   - [x] Better time management
 // - Evaluation
 //   - [x] Piece values
 //   - [x] Piece-square tables
@@ -186,22 +186,6 @@ public class MyBot : IChessBot
         return score;
     }
 
-    public struct Killers
-    {
-        Move moveA, moveB;
-
-        public void Add(Move move)
-        {
-            if (!move.Equals(moveA))
-            {
-                moveB = moveA;
-                moveA = move;
-            }
-        }
-
-        public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
-    }
-
     int search(int depth, int alpha, int beta, bool isTopLevel = false)
     {
         bool quiesce = depth <= 0;
@@ -298,6 +282,23 @@ public class MyBot : IChessBot
         // 3 - Upper bound
         public byte nodeType;
     }
+
+    struct Killers
+    {
+        Move moveA, moveB;
+
+        public void Add(Move move)
+        {
+            if (!move.Equals(moveA))
+            {
+                moveB = moveA;
+                moveA = move;
+            }
+        }
+
+        public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
+    }
+
 
     public int testEval(Board board) // #DEBUG
     {// #DEBUG
