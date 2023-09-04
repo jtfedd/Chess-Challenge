@@ -16,7 +16,7 @@ using System.Linq;
 //   - [ ] Checks during quiescence
 //   - [ ] Promotinus during quiescence
 //   - [ ] Late move reduction
-//   - [ ] Better time management
+//   - [x] Better time management
 // - Evaluation
 //   - [x] Piece values
 //   - [x] Piece-square tables
@@ -32,7 +32,7 @@ using System.Linq;
 //   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 908
+// Token count 1158
 
 public class HeftyBot : IChessBot
 {
@@ -48,6 +48,9 @@ public class HeftyBot : IChessBot
 
     TT_Entry[] tt = new TT_Entry[1048583];
 
+    Killers[] killerMoves = new Killers[50];
+    int[,,] history;
+
     // Debug variables
     int nodesSearched; // #DEBUG
     int evaluations; // #DEBUG
@@ -61,11 +64,6 @@ public class HeftyBot : IChessBot
     bool endgame;
     bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
-    public HeftyBot()//#DEBUG
-    {//#DEBUG
-        //printPieceSquareBonuses(); //#DEBUG
-    }//#DEBUG
-
     int score(bool isWhite)
     {
         int score = 0;
@@ -77,7 +75,6 @@ public class HeftyBot : IChessBot
         while (++i < 7)
         {
             ulong pieces, pieceIter;
-            ulong attacks = 0;
 
             pieces = pieceIter = b.GetPieceBitboard((PieceType)i, isWhite);
 
@@ -86,43 +83,38 @@ public class HeftyBot : IChessBot
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
 
-                // Add piece value and piece square bonus
-                score += pieceValues[i] + getPieceSquareBonus(i - 1, index, isWhite);
+                score +=
+                    // Add piece value and piece square bonus
+                    pieceValues[i] + getPieceSquareBonus(endgame && i == 6 ? i : i - 1, index, isWhite) +
+                    // Prefer piece mobility
+                    BitboardHelper.GetNumberOfSetBits(pieceAttacks) +
+                    // We like attacking the enemy king
+                    10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & enemyKing);
 
-                // Prefer piece mobility
-                score += BitboardHelper.GetNumberOfSetBits(pieceAttacks);
+                if (i == 1)
+                {
+                    // We like pawns that defend other pawns
+                    score += 10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & pieces);
 
-                // We like attacking the enemy king
-                score += 10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & enemyKing);
+                    // We don't like doubled pawns
+                    if ((pieceIter & (0x0101010101010101ul << (index % 8))) != 0) score -= 50;
 
-                if (i != 1) continue;
-
-                attacks |= pieceAttacks;
-
-                // We like passed pawns
-                pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
-                while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
-                if (pieceAttacks == 0) score += 50;
-            }
-
-            if (i == 1)
-            {
-                // We like pawn chains
-                score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
-                // We don't like doubled pawns
-                int j = 0;
-                while (j < 8) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j++) - 1, 0);
+                    // We like passed pawns
+                    pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
+                    while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
+                    if (pieceAttacks == 0) score += 50;
+                }
             }
         }
 
         return score;
     }
 
-    int evaluate(bool whiteToMove)
+    int evaluate(bool isWhite)
     {
         evaluations++; // #DEBUG
         endgame = isSideEndgame(true) && isSideEndgame(false);
-        return score(whiteToMove) - score(!whiteToMove);
+        return score(isWhite) - score(!isWhite);
     }
 
     public Move Think(Board board, Timer timer)
@@ -150,17 +142,6 @@ public class HeftyBot : IChessBot
         return bestMove.IsNull ? board.GetLegalMoves()[0] : bestMove;
     }
 
-    const int million = 1000000;
-    const int hashMoveScore = 100 * million;
-    const int winningCaptureBias = 8 * million;
-    const int promoteBias = 6 * million;
-    const int killerBias = 4 * million;
-    const int losingCaptureBias = 2 * million;
-    const int regularBias = 0;
-
-    Killers[] killerMoves = new Killers[50];
-    int[,,] history;
-
     int getPieceSquareBonus(int pieceType, int index, bool isWhite)
     {
         int pieceSquareIndex = isWhite ? index : 63 - index;
@@ -169,56 +150,29 @@ public class HeftyBot : IChessBot
 
     int moveOrder(Move move, Move hashMove)
     {
-        if (move.Equals(hashMove)) return hashMoveScore;
-
-        ulong oppPawns = b.GetPieceBitboard(PieceType.Pawn, !b.IsWhiteToMove);
+        if (move.Equals(hashMove)) return 100000000;
 
         int score = 0;
 
         if (move.IsCapture)
         {
             int delta = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
-            score += (delta >= 0 || !b.SquareIsAttackedByOpponent(move.TargetSquare) ? winningCaptureBias : losingCaptureBias) + delta;
+            score += (delta >= 0 || !b.SquareIsAttackedByOpponent(move.TargetSquare) ? 8000000 : 2000000) + delta;
         }
         else
         {
-            bool isKiller = b.PlyCount < 50 && killerMoves[b.PlyCount].Match(move);
-            score += isKiller ? killerBias : regularBias;
+            if (b.PlyCount < 50 && killerMoves[b.PlyCount].Match(move)) score += 4000000;
             score += history[b.IsWhiteToMove ? 0 : 1, move.StartSquare.Index, move.TargetSquare.Index];
         }
 
-        if (move.IsPromotion) score += promoteBias;
+        if (move.IsPromotion) score += 6000000;
         else if (move.MovePieceType != PieceType.King)
         {
             int pieceType = (int)move.MovePieceType - 1;
-            int toScore = getPieceSquareBonus(pieceType, move.TargetSquare.Index, b.IsWhiteToMove);
-            int fromScore = getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
-            score += toScore - fromScore;
-
-            
-            if ((BitboardHelper.GetPawnAttacks(move.TargetSquare, b.IsWhiteToMove) & oppPawns) != 0) score -= 50;
-            else if (b.SquareIsAttackedByOpponent(move.TargetSquare)) score -= 25;
+            score += getPieceSquareBonus(pieceType, move.TargetSquare.Index, b.IsWhiteToMove) - getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
         }
 
         return score;
-    }
-
-    public struct Killers
-    {
-        public Move moveA;
-        public Move moveB;
-
-        public void Add(Move move)
-        {
-            if (!move.Equals(moveA))
-            {
-                moveB = moveA;
-                moveA = move;
-            }
-        }
-
-        public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
-
     }
 
     int search(int depth, int alpha, int beta, bool isTopLevel = false)
@@ -317,6 +271,29 @@ public class HeftyBot : IChessBot
         // 3 - Upper bound
         public byte nodeType;
     }
+
+    struct Killers
+    {
+        Move moveA, moveB;
+
+        public void Add(Move move)
+        {
+            if (!move.Equals(moveA))
+            {
+                moveB = moveA;
+                moveA = move;
+            }
+        }
+
+        public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
+    }
+
+    /*
+    public HeftyBot()//#DEBUG
+    {//#DEBUG
+        printPieceSquareBonuses(); //#DEBUG
+    }//#DEBUG
+    */
 
     public int testEval(Board board) // #DEBUG
     {// #DEBUG

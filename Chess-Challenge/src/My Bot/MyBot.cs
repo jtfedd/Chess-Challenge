@@ -10,8 +10,8 @@ using System.Linq;
 //   - [x] Transposition table move ordering
 //   - [x] Quiescence search
 //   - [x] Principal variation search
-//   - [x] History heuristic
-//   - [x] Killer moves heuristic
+//   - [ ] History heuristic
+//   - [ ] Killer moves heuristic
 //   - [ ] Delta pruning
 //   - [ ] Checks during quiescence
 //   - [ ] Promotinus during quiescence
@@ -32,7 +32,7 @@ using System.Linq;
 //   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 1158
+// Token count 889
 
 public class MyBot : IChessBot
 {
@@ -47,9 +47,6 @@ public class MyBot : IChessBot
     int msToThink;
 
     TT_Entry[] tt = new TT_Entry[1048583];
-
-    Killers[] killerMoves = new Killers[50];
-    int[,,] history;
 
     // Debug variables
     int nodesSearched; // #DEBUG
@@ -81,11 +78,13 @@ public class MyBot : IChessBot
             while (pieceIter != 0)
             {
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
+                var pieceSquareIndex = isWhite ? index : 63 - index;
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
                 
                 score +=
                     // Add piece value and piece square bonus
-                    pieceValues[i] + getPieceSquareBonus(endgame && i == 6 ? i : i - 1, index, isWhite) +
+                    pieceValues[i] + 
+                    (int)(packedPV[(endgame && i == 6 ? i : i - 1) * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50 +
                     // Prefer piece mobility
                     BitboardHelper.GetNumberOfSetBits(pieceAttacks) +
                     // We like attacking the enemy king
@@ -119,7 +118,6 @@ public class MyBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
-        history = new int[2, 64, 64];
         msToThink = timer.IncrementMilliseconds + Math.Min(timer.MillisecondsRemaining / 20, timer.GameStartTimeMilliseconds / 40);
 
         b = board;
@@ -142,38 +140,7 @@ public class MyBot : IChessBot
         return bestMove.IsNull ? board.GetLegalMoves()[0] : bestMove;
     }
 
-    int getPieceSquareBonus(int pieceType, int index, bool isWhite)
-    {
-        int pieceSquareIndex = isWhite ? index : 63 - index;
-        return (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50;
-    }
-
-    int moveOrder(Move move, Move hashMove)
-    {
-        if (move.Equals(hashMove)) return 100000000;
-
-        int score = 0;
-
-        if (move.IsCapture)
-        {
-            int delta = pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
-            score += (delta >= 0 || !b.SquareIsAttackedByOpponent(move.TargetSquare) ? 8000000 : 2000000) + delta;
-        }
-        else
-        {
-            if (b.PlyCount < 50 && killerMoves[b.PlyCount].Match(move)) score += 4000000;
-            score += history[b.IsWhiteToMove ? 0 : 1, move.StartSquare.Index, move.TargetSquare.Index];
-        }
-
-        if (move.IsPromotion) score += 6000000;
-        else if (move.MovePieceType != PieceType.King)
-        {
-            int pieceType = (int)move.MovePieceType - 1;
-            score += getPieceSquareBonus(pieceType, move.TargetSquare.Index, b.IsWhiteToMove) - getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
-        }
-
-        return score;
-    }
+    int moveOrder(Move move, Move storedBest) => move.Equals(storedBest) ? 1000000 : pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
 
     int search(int depth, int alpha, int beta, bool isTopLevel = false)
     {
@@ -244,11 +211,6 @@ public class MyBot : IChessBot
             if (alpha >= beta)
             {
                 cutoffs++; //#DEBUG
-                if (!move.IsCapture && b.PlyCount < 50)
-                {
-                    killerMoves[b.PlyCount].Add(move);
-                    history[b.IsWhiteToMove ? 0 : 1, move.StartSquare.Index, move.TargetSquare.Index] += depth * depth;
-                }
                 nodeType = 1; // Lower bound
                 break;
             }
@@ -272,22 +234,6 @@ public class MyBot : IChessBot
         public byte nodeType;
     }
 
-    struct Killers
-    {
-        Move moveA, moveB;
-
-        public void Add(Move move)
-        {
-            if (!move.Equals(moveA))
-            {
-                moveB = moveA;
-                moveA = move;
-            }
-        }
-
-        public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
-    }
-
     public MyBot()//#DEBUG
     {//#DEBUG
         //printPieceSquareBonuses(); //#DEBUG
@@ -302,7 +248,6 @@ public class MyBot : IChessBot
 
     public void benchmarkSearch(Board board, int maxDepth) // #DEBUG
     {// #DEBUG
-        history = new int[2, 64, 64];
         b = board;// #DEBUG
         t = new Timer(int.MaxValue); //#DEBUG
         msToThink = int.MaxValue; //#DEBUG
@@ -383,18 +328,20 @@ public class MyBot : IChessBot
             {// #DEBUG
                 for (int col = 0; col < 8; col++)// #DEBUG
                 {// #DEBUG
-                    Console.Write($"{getPieceSquareBonus(i, new Square(col, row).Index, true)} ");// #DEBUG
+                    Console.Write($"{getPieceSquareBonus(i, new Square(col, row).Index)} ");// #DEBUG
                 }// #DEBUG
 
                 Console.Write("\t\t");//#DEBUG
 
                 for (int col = 0; col < 8; col++)// #DEBUG
                 {// #DEBUG
-                    Console.Write($"{getPieceSquareBonus(i, new Square(col, row).Index, false)} ");// #DEBUG
+                    Console.Write($"{getPieceSquareBonus(i, 63 - new Square(col, row).Index)} ");// #DEBUG
                 }// #DEBUG
                 Console.WriteLine();// #DEBUG
             }// #DEBUG
             Console.WriteLine();// #DEBUG
         } // #DEBUG
     }// #DEBUG
+
+    int getPieceSquareBonus(int pieceType, int pieceSquareIndex) => (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50; //#DEBUG
 }
