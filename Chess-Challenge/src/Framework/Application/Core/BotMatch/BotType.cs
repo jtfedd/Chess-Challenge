@@ -21,6 +21,7 @@ namespace ChessChallenge.BotMatch
         EvalV1,
         EvalV2,
         EvalV3,
+        HeftyBot,
 
         EvilBot,
         ExampleBot,
@@ -41,6 +42,8 @@ namespace ChessChallenge.BotMatch
                 BotType.EvalV1 => MakeBot(new EvalV1()),
                 BotType.EvalV2 => MakeBot(new EvalV2()),
                 BotType.EvalV3 => MakeBot(new EvalV3()),
+                BotType.HeftyBot => MakeBot(new HeftyBot()),
+                
 
                 BotType.EvilBot => MakeBot(new EvilBot()),
                 BotType.ExampleBot => MakeBot(new ExampleBot()),

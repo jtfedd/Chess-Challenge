@@ -10,13 +10,14 @@ using System.Linq;
 //   - [x] Transposition table move ordering
 //   - [x] Quiescence search
 //   - [x] Principal variation search
+//   - [x] Better time management
+//   - [ ] Better move ordering
 //   - [ ] History heuristic
 //   - [ ] Killer moves heuristic
 //   - [ ] Delta pruning
 //   - [ ] Checks during quiescence
-//   - [ ] Promotinus during quiescence
+//   - [ ] Promotions during quiescence
 //   - [ ] Late move reduction
-//   - [x] Better time management
 // - Evaluation
 //   - [x] Piece values
 //   - [x] Piece-square tables
@@ -26,13 +27,13 @@ using System.Linq;
 //   - [x] Pawn structure bonus
 //   - [x] Passed pawn bonus
 //   - [x] Doubled pawn deduction
-//   - [ ] Bishop pair bonus
-//   - [ ] Bishop endgame bonus
-//   - [ ] Isolated pawn deduction
-//   - [ ] King safety
-//   - [ ] Relative material advantage
+//   - [x] Bishop pair bonus
+//   - [x] Bishop endgame bonus
+//   - [x] Isolated pawn deduction
+//   - [x] King safety
+//   - [x] Relative material advantage
 
-// Token count 889
+// Token count 1032
 
 public class MyBot : IChessBot
 {
@@ -61,9 +62,10 @@ public class MyBot : IChessBot
     bool endgame;
     bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
-    int score(bool isWhite)
+    Tuple<int, int> score(bool isWhite)
     {
-        int score = 0;
+        int material = 0;
+        int bonus = 0;
 
         var enemyKing = BitboardHelper.GetKingAttacks(b.GetKingSquare(!isWhite));
         var enemyPawns = b.GetPieceBitboard(PieceType.Pawn, !isWhite);
@@ -72,48 +74,74 @@ public class MyBot : IChessBot
         while (++i < 7)
         {
             ulong pieces, pieceIter;
+            int count = 0;
 
             pieces = pieceIter = b.GetPieceBitboard((PieceType)i, isWhite);
 
             while (pieceIter != 0)
             {
+                count++;
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
                 var pieceSquareIndex = isWhite ? index : 63 - index;
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
                 
-                score +=
-                    // Add piece value and piece square bonus
-                    pieceValues[i] + 
+                bonus +=
+                    // Add piece square bonus
                     (int)(packedPV[(endgame && i == 6 ? i : i - 1) * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50 +
                     // Prefer piece mobility
                     BitboardHelper.GetNumberOfSetBits(pieceAttacks) +
                     // We like attacking the enemy king
                     10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & enemyKing);
 
+                // Pawns
                 if (i == 1)
                 {
+                    int file = index % 8;
+
                     // We like pawns that defend other pawns
-                    score += 10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & pieces);
+                    bonus += 10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & pieces);
 
                     // We don't like doubled pawns
-                    if ((pieceIter & (0x0101010101010101ul << (index % 8))) != 0) score -= 50;
+                    if ((pieceIter & (0x0101010101010101ul << file)) != 0) bonus -= 50;
+
+                    // We don't like isolated pawns
+                    if ((index == 0 ? true : (pieces & (0x0101010101010101ul << (file - 1))) == 0) && (index == 7 ? true : (pieces & (0x0101010101010101ul << (file + 1))) == 0)) bonus -= 25;
 
                     // We like passed pawns
                     pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
                     while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
-                    if (pieceAttacks == 0) score += 50;
+                    if (pieceAttacks == 0) bonus += 50;
                 }
+
+                // King
+                if (i == 6) bonus += 5 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & (isWhite ? b.WhitePiecesBitboard : b.BlackPiecesBitboard));
+                else material += pieceValues[i];
+            }
+
+            // Bishops
+            if (i == 3)
+            {
+                // We want the bishop pair
+                if (count > 1) bonus += 30;
+                // We want bishops in the endgame
+                if (endgame) bonus += 10 * count;
             }
         }
 
-        return score;
+        return new(material, material + bonus);
     }
 
     int evaluate(bool isWhite)
     {
         evaluations++; // #DEBUG
         endgame = isSideEndgame(true) && isSideEndgame(false);
-        return score(isWhite) - score(!isWhite);
+
+        var (myMaterial, myScore) = score(isWhite);
+        var (oppMaterial, oppScore) = score(!isWhite);
+
+        var diff = (int)(100.0 * (myMaterial - oppMaterial) / (myMaterial + oppMaterial));
+
+        return myScore - oppScore + diff;
     }
 
     public Move Think(Board board, Timer timer)
@@ -149,14 +177,12 @@ public class MyBot : IChessBot
         if (quiesce) quiesenceNodes++; // #DEBUG
         else nodesSearched++; // #DEBUG
 
-        if (cancelled) return 0;
-
         // Encourage the engine to fight to the end by making early checkmates
         // have a better score than later checkmates.
         if (b.IsInCheckmate()) return b.PlyCount - 100000;
 
         // Check for draw by means other than stalemate. Stalemate will be checked when we generate moves.
-        if (b.IsFiftyMoveDraw() || b.IsRepeatedPosition() || b.IsInsufficientMaterial()) return 0;
+        if (cancelled || b.IsFiftyMoveDraw() || b.IsRepeatedPosition() || b.IsInsufficientMaterial()) return 0;
 
         // Adjust alpha and beta for the current ply of the game.
         beta = Math.Min(100000 - b.PlyCount, beta);
