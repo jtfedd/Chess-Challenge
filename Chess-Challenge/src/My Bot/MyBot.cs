@@ -64,11 +64,6 @@ public class MyBot : IChessBot
     bool endgame;
     bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
-    public MyBot()//#DEBUG
-    {//#DEBUG
-        //printPieceSquareBonuses(); //#DEBUG
-    }//#DEBUG
-
     int score(bool isWhite)
     {
         int score = 0;
@@ -292,6 +287,11 @@ public class MyBot : IChessBot
 
         public bool Match(Move move) => move.Equals(moveA) || move.Equals(moveB);
     }
+
+    public MyBot()//#DEBUG
+    {//#DEBUG
+        //printPieceSquareBonuses(); //#DEBUG
+    }//#DEBUG
 
 
     public int testEval(Board board) // #DEBUG
