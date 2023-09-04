@@ -32,7 +32,7 @@ using System.Linq;
 //   - [ ] King safety
 //   - [ ] Relative material advantage
 
-// Token count 908
+// Token count 1158
 
 public class MyBot : IChessBot
 {
@@ -80,7 +80,6 @@ public class MyBot : IChessBot
         while (++i < 7)
         {
             ulong pieces, pieceIter;
-            ulong attacks = 0;
 
             pieces = pieceIter = b.GetPieceBitboard((PieceType)i, isWhite);
 
@@ -88,44 +87,39 @@ public class MyBot : IChessBot
             {
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
+                
+                score +=
+                    // Add piece value and piece square bonus
+                    pieceValues[i] + getPieceSquareBonus(endgame && i == 6 ? i : i - 1, index, isWhite) +
+                    // Prefer piece mobility
+                    BitboardHelper.GetNumberOfSetBits(pieceAttacks) +
+                    // We like attacking the enemy king
+                    10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & enemyKing);
 
-                // Add piece value and piece square bonus
-                score += pieceValues[i] + getPieceSquareBonus(endgame && i == 6 ? i : i - 1, index, isWhite);
+                if (i == 1)
+                {
+                    // We like pawns that defend other pawns
+                    score += 10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & pieces);
 
-                // Prefer piece mobility
-                score += BitboardHelper.GetNumberOfSetBits(pieceAttacks);
+                    // We don't like doubled pawns
+                    if ((pieceIter & (0x0101010101010101ul << (index % 8))) != 0) score -= 50;
 
-                // We like attacking the enemy king
-                score += 10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & enemyKing);
-
-                if (i != 1) continue;
-
-                attacks |= pieceAttacks;
-
-                // We like passed pawns
-                pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
-                while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
-                if (pieceAttacks == 0) score += 50;
-            }
-
-            if (i == 1)
-            {
-                // We like pawn chains
-                score += 10 * BitboardHelper.GetNumberOfSetBits(pieces & attacks);
-                // We don't like doubled pawns
-                int j = 0;
-                while (j < 8) score -= 50 * Math.Max(BitboardHelper.GetNumberOfSetBits(pieces & 0x0101010101010101ul << j++) - 1, 0);
+                    // We like passed pawns
+                    pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
+                    while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
+                    if (pieceAttacks == 0) score += 50;
+                }
             }
         }
 
         return score;
     }
 
-    int evaluate(bool whiteToMove)
+    int evaluate(bool isWhite)
     {
         evaluations++; // #DEBUG
         endgame = isSideEndgame(true) && isSideEndgame(false);
-        return score(whiteToMove) - score(!whiteToMove);
+        return score(isWhite) - score(!isWhite);
     }
 
     public Move Think(Board board, Timer timer)
@@ -180,7 +174,7 @@ public class MyBot : IChessBot
         else if (move.MovePieceType != PieceType.King)
         {
             int pieceType = (int)move.MovePieceType - 1;
-            score += getPieceSquareBonus((int)move.MovePieceType - 1, move.TargetSquare.Index, b.IsWhiteToMove) - getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
+            score += getPieceSquareBonus(pieceType, move.TargetSquare.Index, b.IsWhiteToMove) - getPieceSquareBonus(pieceType, move.StartSquare.Index, b.IsWhiteToMove);
         }
 
         return score;
