@@ -1,4 +1,5 @@
-﻿using ChessChallenge.API;
+﻿using Chess_Challenge.src.My_Bot;
+using ChessChallenge.API;
 using System;
 using System.Linq;
 
@@ -35,11 +36,27 @@ using System.Linq;
 
 // Token count 1032
 
-public class MyBot : IChessBot
+public class TuningBot : IChessBot
 {
+    // Tuning Parameters
+    TuningParams tuning;
+
+    public TuningBot(TuningParams p)
+    {
+        t = new Timer(int.MaxValue);
+        msToThink = int.MaxValue;
+        tuning = p;
+        packedPV = p.pv;
+        pieceValues[1] = p.pawn;
+        pieceValues[2] = p.knight;
+        pieceValues[3] = p.bishop;
+        pieceValues[4] = p.rook;
+        pieceValues[5] = p.queen;
+    }
+
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 320, 325, 550, 975, 10000 };
-    ulong[] packedPV = { 0x32643C3732373732, 0x32643C37322D3C32, 0x3264463C32283C32, 0x3264504D4B321932, 0x000A141414140A00, 0x0A1E323732371E0A, 0x14323C41413C321E, 0x1432414646413714, 0x1E2828282828281E, 0x28323237323C3728, 0x283237373C3C320A, 0x28323C3C3C3C3228, 0x32372D2D2D2D2D32, 0x323C323232323232, 0x323C323232323237, 0x323C323232323237, 0x1E28282D3228281E, 0x2832323232373228, 0x2832373737373728, 0x2D32373737373237, 0x141414141E284646, 0x0A0A0A0A141E4650, 0x0A0A0A0A141E323C, 0x000000000A1E3232, 0x0014141414141400, 0x0A1E282828281414, 0x1428465050463214, 0x1E32505A5A503214 };
+    ulong[] packedPV;// = { 0x32643C3732373732, 0x32643C37322D3C32, 0x3264463C32283C32, 0x3264504D4B321932, 0x000A141414140A00, 0x0A1E323732371E0A, 0x14323C41413C321E, 0x1432414646413714, 0x1E2828282828281E, 0x28323237323C3728, 0x283237373C3C320A, 0x28323C3C3C3C3228, 0x32372D2D2D2D2D32, 0x323C323232323232, 0x323C323232323237, 0x323C323232323237, 0x1E28282D3228281E, 0x2832323232373228, 0x2832373737373728, 0x2D32373737373237, 0x141414141E284646, 0x0A0A0A0A141E4650, 0x0A0A0A0A141E323C, 0x000000000A1E3232, 0x0014141414141400, 0x0A1E282828281414, 0x1428465050463214, 0x1E32505A5A503214 };
 
     Board b;
     ulong zKey => b.ZobristKey;
@@ -62,10 +79,9 @@ public class MyBot : IChessBot
     bool endgame;
     bool isSideEndgame(bool isWhite) => b.GetPieceBitboard(PieceType.Queen, isWhite) == 0 || (b.GetPieceBitboard(PieceType.Rook, isWhite) == 0 && BitboardHelper.GetNumberOfSetBits(b.GetPieceBitboard(PieceType.Bishop, isWhite) | b.GetPieceBitboard(PieceType.Knight, isWhite)) < 2);
 
-    Tuple<int, int> score(bool isWhite)
+    int score(bool isWhite)
     {
-        int material = 0;
-        int bonus = 0;
+        int value = 0;
 
         var enemyKing = BitboardHelper.GetKingAttacks(b.GetKingSquare(!isWhite));
         var enemyPawns = b.GetPieceBitboard(PieceType.Pawn, !isWhite);
@@ -84,14 +100,15 @@ public class MyBot : IChessBot
                 var index = BitboardHelper.ClearAndGetIndexOfLSB(ref pieceIter);
                 var pieceSquareIndex = isWhite ? index : 63 - index;
                 var pieceAttacks = BitboardHelper.GetPieceAttacks((PieceType)i, new Square(index), b, isWhite);
-                
-                bonus +=
+
+                value +=
+                    pieceValues[i] +
                     // Add piece square bonus
-                    (int)(packedPV[(endgame && i == 6 ? i : i - 1) * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50 +
+                    (int)(packedPV[(endgame && i == 6 ? i : i - 1) * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 100 +
                     // Prefer piece mobility
-                    BitboardHelper.GetNumberOfSetBits(pieceAttacks) +
+                    tuning.mobility * BitboardHelper.GetNumberOfSetBits(pieceAttacks) +
                     // We like attacking the enemy king
-                    10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & enemyKing);
+                    tuning.kingAttack * BitboardHelper.GetNumberOfSetBits(pieceAttacks & enemyKing);
 
                 // Pawns
                 if (i == 1)
@@ -99,36 +116,35 @@ public class MyBot : IChessBot
                     int file = index % 8;
 
                     // We like pawns that defend other pawns
-                    bonus += 10 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & pieces);
+                    value += tuning.pawnChain * BitboardHelper.GetNumberOfSetBits(pieceAttacks & pieces);
 
                     // We don't like doubled pawns
-                    if ((pieceIter & (0x0101010101010101ul << file)) != 0) bonus -= 50;
+                    if ((pieceIter & (0x0101010101010101ul << file)) != 0) value -= tuning.doubledPawns;
 
                     // We don't like isolated pawns
-                    if ((index == 0 ? true : (pieces & (0x0101010101010101ul << (file - 1))) == 0) && (index == 7 ? true : (pieces & (0x0101010101010101ul << (file + 1))) == 0)) bonus -= 25;
+                    if ((index == 0 ? true : (pieces & (0x0101010101010101ul << (file - 1))) == 0) && (index == 7 ? true : (pieces & (0x0101010101010101ul << (file + 1))) == 0)) value -= tuning.isolatedPawns;
 
                     // We like passed pawns
                     pieceAttacks |= 1ul << index + (isWhite ? 8 : -8);
                     while (pieceAttacks != 0 && (pieceAttacks & enemyPawns) == 0) pieceAttacks = isWhite ? pieceAttacks << 8 : pieceAttacks >> 8;
-                    if (pieceAttacks == 0) bonus += 50;
+                    if (pieceAttacks == 0) value += tuning.passedPawns;
                 }
 
                 // King
-                if (i == 6) bonus += 5 * BitboardHelper.GetNumberOfSetBits(pieceAttacks & (isWhite ? b.WhitePiecesBitboard : b.BlackPiecesBitboard));
-                else material += pieceValues[i];
+                if (i == 6) value += tuning.kingDefense * BitboardHelper.GetNumberOfSetBits(pieceAttacks & (isWhite ? b.WhitePiecesBitboard : b.BlackPiecesBitboard));
             }
 
             // Bishops
             if (i == 3)
             {
                 // We want the bishop pair
-                if (count > 1) bonus += 30;
+                if (count > 1) value += tuning.bishopPair;
                 // We want bishops in the endgame
-                if (endgame) bonus += 10 * count;
+                if (endgame) value += tuning.bishopEndgame * count;
             }
         }
 
-        return new(material, material + bonus);
+        return value;
     }
 
     int evaluate(bool isWhite)
@@ -136,12 +152,13 @@ public class MyBot : IChessBot
         evaluations++; // #DEBUG
         endgame = isSideEndgame(true) && isSideEndgame(false);
 
-        var (myMaterial, myScore) = score(isWhite);
-        var (oppMaterial, oppScore) = score(!isWhite);
+        return score(isWhite) - score(!isWhite);
+    }
 
-        var diff = (int)(100.0 * (myMaterial - oppMaterial) / (myMaterial + oppMaterial));
-
-        return myScore - oppScore + diff;
+    public int tuneEval(Board board)
+    {
+        b = board;
+        return search(0, -100000, 100000, false);
     }
 
     public Move Think(Board board, Timer timer)
@@ -260,11 +277,12 @@ public class MyBot : IChessBot
         public byte nodeType;
     }
 
-    public MyBot()//#DEBUG
+    /*
+    public TuningBot()//#DEBUG
     {//#DEBUG
         //printPieceSquareBonuses(); //#DEBUG
     }//#DEBUG
-    
+    */
 
     public int testEval(Board board) // #DEBUG
     {// #DEBUG
@@ -346,7 +364,7 @@ public class MyBot : IChessBot
     }//#DEBUG
 
 
-    void printPieceSquareBonuses()// #DEBUG
+    public void printPieceSquareBonuses()// #DEBUG
     {// #DEBUG
         for (int i = 0; i < 7; i++)// #DEBUG
         {// #DEBUG
@@ -369,5 +387,5 @@ public class MyBot : IChessBot
         } // #DEBUG
     }// #DEBUG
 
-    int getPieceSquareBonus(int pieceType, int pieceSquareIndex) => (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 50; //#DEBUG
+    int getPieceSquareBonus(int pieceType, int pieceSquareIndex) => (int)(packedPV[pieceType * 4 + Math.Min(pieceSquareIndex % 8, 7 - pieceSquareIndex % 8)] >> pieceSquareIndex / 8 * 8 & 0x00000000000000FF) - 100; //#DEBUG
 }

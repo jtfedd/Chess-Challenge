@@ -13,6 +13,7 @@ namespace ChessChallenge.Application
             if (args[0] == "benchmark") Benchmarks.Benchmarks.Run();
             if (args[0] == "sandbox") testSearch();
             if (args[0] == "pvtables") PVTables.Run();
+            if (args[0] == "tune") Tuning.Tuning.Run();
         }
 
         static void printTokens()

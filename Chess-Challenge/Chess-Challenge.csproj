@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MySql.Data" Version="8.1.0" />
     <PackageReference Include="Raylib-cs" Version="4.5.0.2" />
   </ItemGroup>
 
@@ -30,6 +31,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>
     <Compile Update="src\My Bot\HeftyBot.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Compile>
+    <Compile Update="src\My Bot\TuningBot.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>
     <Compile Update="src\My Bot\Transposition.cs">

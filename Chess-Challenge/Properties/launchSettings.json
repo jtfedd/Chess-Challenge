@@ -19,6 +19,10 @@
     "Generate PV Tables": {
       "commandName": "Project",
       "commandLineArgs": "pvtables"
+    },
+    "Tuning": {
+      "commandName": "Project",
+      "commandLineArgs": "tune"
     }
   }
 }
