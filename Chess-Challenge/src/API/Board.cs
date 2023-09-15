@@ -447,6 +447,13 @@ namespace ChessChallenge.API
             return new Board(boardCore);
         }
 
+		public static Board CreateBoardFromPosition(FenUtility.PositionInfo pos)
+		{
+			Chess.Board boardCore = new Chess.Board();
+			boardCore.LoadPosition(pos);
+			return new Board(boardCore);
+		}
+
         void OnPositionChanged()
         {
             moveGen.NotifyPositionChanged();

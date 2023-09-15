@@ -2,10 +2,6 @@
 using MySql.Data.MySqlClient;
 using ChessChallenge.API;
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,7 +13,7 @@ namespace ChessChallenge.Tuning
             var t = new Tuning();
             var bestParams = new TuningParams();
             Console.WriteLine(bestParams.print());
-            bestParams = t.tune(bestParams, 2);
+            //bestParams = t.tune(bestParams, 2);
             bestParams = t.tune(bestParams, 1);
             Console.WriteLine(bestParams.print());
         }
@@ -60,6 +56,7 @@ namespace ChessChallenge.Tuning
                         var testParams = new TuningParams(bestParams);
                         testParams.values[pi] += delta;
                         double newE = calcError(testParams);
+                        Console.WriteLine($"{pi}, {bestParams.values[pi]}, {delta}, {newE}, best: {best}");
                         if (newE < best)
                         {
                             best = newE;
@@ -80,26 +77,49 @@ namespace ChessChallenge.Tuning
             return bestParams;
         }
 
+        Mutex sumMutex;
+        double sumOfDiffs;
+
         double calcError(TuningParams p)
         {
-            double sumOfDiffs = 0;
+            sumOfDiffs = 0;
+            sumMutex = new Mutex();
             var testbot = new TuningBot(p);
-            int positions = 100;
+            int positions = 100000;
+            int threads = 10;
 
-            for (int i = 0; i < positions; i++)
+            Task[] tasks = new Task[threads];
+
+            for (int i = 0; i < threads; i++)
             {
-                int expected = positionEvals[i].eval;
-                var b = Board.CreateBoardFromFEN(positionEvals[i].fen);
-                int actual = testbot.tuneEval(b);
+                int captured = i;
+                //Console.WriteLine($"Start thread {captured}");
+                tasks[i] = Task.Factory.StartNew(() => calcRunner(p, captured, threads, positions), TaskCreationOptions.LongRunning);
+            }
 
-                //Console.WriteLine($"{expected} {actual}");
-                int diff = expected - actual;
-                int diffSquared = diff * diff;
-
-                sumOfDiffs += diffSquared;
+            for (int i = 0; i < threads; i++)
+            {
+                tasks[i].Wait();
             }
 
             return sumOfDiffs / positions;
+        }
+
+        void calcRunner(TuningParams p, int index, int threads, int positions)
+        {
+            var testbot = new TuningBot(p);
+            //Console.WriteLine($"Running thread {index}");
+
+            for (int i = index; i < positions; i += threads)
+            {
+                //Console.WriteLine($"Thread {index} position {i}");
+                int eval = testbot.tuneEval(Board.CreateBoardFromFEN(positionEvals[i].fen));
+                int diff = positionEvals[i].eval - eval;
+
+                sumMutex.WaitOne();
+                sumOfDiffs += diff * diff;
+                sumMutex.ReleaseMutex();
+            }
         }
 
         PositionEval[] fetchPositions() {
