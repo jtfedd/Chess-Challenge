@@ -1,9 +1,9 @@
 ﻿using Chess_Challenge.src.My_Bot;
 using MySql.Data.MySqlClient;
-using ChessChallenge.API;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ChessChallenge.Chess;
 
 namespace ChessChallenge.Tuning
 {
@@ -12,9 +12,10 @@ namespace ChessChallenge.Tuning
         public static void Run() {
             var t = new Tuning();
             var bestParams = new TuningParams();
-            Console.WriteLine(bestParams.print());
-            //bestParams = t.tune(bestParams, 2);
+
+            bestParams = t.tune(bestParams, 2);
             bestParams = t.tune(bestParams, 1);
+
             Console.WriteLine(bestParams.print());
         }
 
@@ -38,38 +39,61 @@ namespace ChessChallenge.Tuning
             int[] directions = new int[nParams];
             Array.Fill(directions, 1);
 
-            while(improved)
+            bool[] improvements = new bool[nParams];
+            Array.Fill(improvements, false);
+
+            bool isTopLevel = true;
+            int innerIterations = 0;
+
+            while(true)
             {
                 improved = false;
 
                 for (int pi = 0; pi < nParams; pi++)
                 {
                     if (TuningParams.skip(pi)) continue;
+                    if (!isTopLevel && !improvements[pi]) continue;
 
                     for (int j = 0; j < 2; j++) {
                         var delta = step * directions[pi];
-                        if (bestParams.values[pi] + delta > bestParams.max(pi) || bestParams.values[pi] + delta < bestParams.min(pi)) {
-                            directions[pi] *= -1;
-                            continue;
+
+                        Console.WriteLine($"Tuning {pi}, {bestParams.values[pi]}, {best}");
+                        var (newE, improvedParam) = improve(bestParams, pi, delta, best);
+                        improvements[pi] = improvedParam;
+                        if (improvedParam)
+                        {
+                            Console.WriteLine("improved");
+                            best = newE;
+                            improved = true;
+
+                            break;
                         }
 
-                        var testParams = new TuningParams(bestParams);
-                        testParams.values[pi] += delta;
-                        double newE = calcError(testParams);
-                        Console.WriteLine($"{pi}, {bestParams.values[pi]}, {delta}, {newE}, best: {best}");
-                        if (newE < best)
-                        {
-                            best = newE;
-                            bestParams = testParams;
-                            improved = true;
-                            Console.WriteLine(best);
-                            Console.WriteLine(bestParams.print());
-                            break;
-                        } else
-                        {
-                            directions[pi] *= -1;
-                            continue;
-                        }
+                        directions[pi] *= -1;
+                    }
+                }
+
+                Console.WriteLine("Iteration finished");
+
+                if (isTopLevel)
+                {
+                    Console.WriteLine("Top Level");
+                    if (!improved) break;
+                    Console.WriteLine("Improved");
+                    isTopLevel = false;
+                } else
+                {
+                    Console.WriteLine("Inner level");
+                    // Don't go too far down a rabbit trail just improving some specific parameters
+                    if (!improved || innerIterations > 7)
+                    {
+                        Console.WriteLine("Not Improved");
+                        isTopLevel = true;
+                        innerIterations = 0;
+                    } else
+                    {
+                        innerIterations++;
+                        Console.WriteLine("Improved");
                     }
                 }
             }
@@ -77,24 +101,57 @@ namespace ChessChallenge.Tuning
             return bestParams;
         }
 
+        Tuple<double, bool> improve(TuningParams p, int pi, int step, double best)
+        {
+            bool improved = true;
+            bool improvedAny = false;
+
+            while(improved)
+            {
+                improved = false;
+
+                p.values[pi] += step;
+                if (p.values[pi] > TuningParams.max(pi) || p.values[pi] < TuningParams.min(pi)) break;
+
+                double newE = calcError(p);
+                Console.WriteLine($"{pi}, {p.values[pi]}, {step}, {newE}, best: {best}");
+                if (newE < best)
+                {
+                    best = newE;
+                    improved = true;
+                    improvedAny = true;
+                    Console.WriteLine(best);
+                    Console.WriteLine(p.print());
+                }
+            }
+
+            p.values[pi] -= step;
+
+            return new(best, improvedAny);
+        }
+
         Mutex sumMutex;
         double sumOfDiffs;
+
+
+        Mutex counterMutex;
+        int counter;
 
         double calcError(TuningParams p)
         {
             sumOfDiffs = 0;
             sumMutex = new Mutex();
+            counter = 0;
+            counterMutex = new Mutex();
             var testbot = new TuningBot(p);
-            int positions = 100000;
             int threads = 10;
 
             Task[] tasks = new Task[threads];
 
             for (int i = 0; i < threads; i++)
             {
-                int captured = i;
                 //Console.WriteLine($"Start thread {captured}");
-                tasks[i] = Task.Factory.StartNew(() => calcRunner(p, captured, threads, positions), TaskCreationOptions.LongRunning);
+                tasks[i] = Task.Factory.StartNew(() => calcRunner(p, positions), TaskCreationOptions.LongRunning);
             }
 
             for (int i = 0; i < threads; i++)
@@ -105,15 +162,21 @@ namespace ChessChallenge.Tuning
             return sumOfDiffs / positions;
         }
 
-        void calcRunner(TuningParams p, int index, int threads, int positions)
+        void calcRunner(TuningParams p, int positions)
         {
             var testbot = new TuningBot(p);
             //Console.WriteLine($"Running thread {index}");
 
-            for (int i = index; i < positions; i += threads)
+            while(true)
             {
+                counterMutex.WaitOne();
+                int i = counter++;
+                counterMutex.ReleaseMutex();
+
+                if (i >= positions) break;
+
                 //Console.WriteLine($"Thread {index} position {i}");
-                int eval = testbot.tuneEval(Board.CreateBoardFromFEN(positionEvals[i].fen));
+                int eval = testbot.tuneEval(API.Board.CreateBoardFromPosition(positionEvals[i].pos));
                 int diff = positionEvals[i].eval - eval;
 
                 sumMutex.WaitOne();
@@ -122,22 +185,24 @@ namespace ChessChallenge.Tuning
             }
         }
 
+        int positions = 100000;
+
         PositionEval[] fetchPositions() {
             Console.WriteLine("Reading positions...");
 
-            var p = new PositionEval[11000000];
+            var p = new PositionEval[positions];
 
             string connstring = "Server=localhost; database=chess; UID=localprogram; password=localprogram";
             var conn = new MySqlConnection(connstring);
             conn.Open();
 
-            string query = "SELECT fen,eval FROM evals WHERE ambiguous=0 AND eval > -1000 AND eval < 1000";
+            string query = $"SELECT fen,eval FROM evals WHERE ambiguous=0 AND eval > -1000 AND eval < 1000 LIMIT {positions}";
             var cmd = new MySqlCommand(query, conn);
             var reader = cmd.ExecuteReader();
             int i = 0;
             while (reader.Read())
             {
-                p[i].fen = reader.GetString(0);
+                p[i].pos = FenUtility.PositionFromFen(reader.GetString(0));
                 p[i].eval = reader.GetInt32(1);
                 i++;
             }
@@ -154,12 +219,12 @@ namespace ChessChallenge.Tuning
 
         struct PositionEval
         {
-            public string fen;
+            public FenUtility.PositionInfo pos;
             public int eval;
 
-            public PositionEval(string fen, int eval)
+            public PositionEval(FenUtility.PositionInfo pos, int eval)
             {
-                this.fen = fen;
+                this.pos = pos;
                 this.eval = eval;
             }
         }

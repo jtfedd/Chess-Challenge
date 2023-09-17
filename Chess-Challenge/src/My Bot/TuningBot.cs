@@ -206,7 +206,13 @@ public class TuningBot : IChessBot
         alpha = Math.Max(b.PlyCount - 100000, alpha);
 
         // If we are in quiescense then adjust alpha for the possibility of not making any captures.
-        if (quiesce && !b.IsInCheck()) alpha = Math.Max(alpha, evaluate(b.IsWhiteToMove));
+        int eval = 0;
+        if (quiesce && !b.IsInCheck())
+        {
+            eval = evaluate(b.IsWhiteToMove);
+            if (eval < alpha - 1000) return alpha;
+            alpha = Math.Max(alpha, eval);
+        }
 
         Move bestMove = Move.NullMove;
         TT_Entry entry = tt[zKey % 1048583];
@@ -236,6 +242,11 @@ public class TuningBot : IChessBot
 
         foreach (Move move in moves)
         {
+            if (quiesce && !b.IsInCheck() && move.IsCapture)
+            {
+                if (eval + pieceValues[(int)move.CapturePieceType] < alpha - 200) continue;
+            }
+
             b.MakeMove(move);
 
             int move_score = -search(depth - 1, -alpha - 1, -alpha);
