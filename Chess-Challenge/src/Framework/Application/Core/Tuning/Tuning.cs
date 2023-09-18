@@ -30,7 +30,7 @@ namespace ChessChallenge.Tuning
         {
             var bestParams = startingParams;
             double best = calcError(bestParams);
-            bool improved = true;
+            bool improved;
 
             Console.WriteLine(best);
             Console.WriteLine(bestParams.print());
@@ -196,14 +196,14 @@ namespace ChessChallenge.Tuning
             var conn = new MySqlConnection(connstring);
             conn.Open();
 
-            string query = $"SELECT fen,eval FROM evals WHERE ambiguous=0 AND eval > -1000 AND eval < 1000 LIMIT {positions}";
+            string query = $"SELECT id,fen,eval FROM evals WHERE ambiguous=0 AND eval > -1000 AND eval < 1000 ORDER BY id ASC LIMIT {positions}";
             var cmd = new MySqlCommand(query, conn);
             var reader = cmd.ExecuteReader();
             int i = 0;
             while (reader.Read())
             {
-                p[i].pos = FenUtility.PositionFromFen(reader.GetString(0));
-                p[i].eval = reader.GetInt32(1);
+                p[i].pos = FenUtility.PositionFromFen(reader.GetString(1));
+                p[i].eval = reader.GetInt32(2);
                 i++;
             }
             conn.Close();
