@@ -6,7 +6,7 @@ namespace ChessChallenge.BotMatch
 {
     public class MatchBots
     {
-        public static BotType A = BotType.MyBot;
+        public static BotType A = BotType.TuningBot;
         public static BotType B = BotType.EvalV3;
     }
 
@@ -22,6 +22,8 @@ namespace ChessChallenge.BotMatch
         EvalV2,
         EvalV3,
         HeftyBot,
+
+        TuningBot,
 
         EvilBot,
         ExampleBot,
@@ -43,11 +45,12 @@ namespace ChessChallenge.BotMatch
                 BotType.EvalV2 => MakeBot(new EvalV2()),
                 BotType.EvalV3 => MakeBot(new EvalV3()),
                 BotType.HeftyBot => MakeBot(new HeftyBot()),
-                
+
+                BotType.TuningBot => MakeBot(new TuningBot(new Chess_Challenge.src.My_Bot.TuningParams())),
 
                 BotType.EvilBot => MakeBot(new EvilBot()),
                 BotType.ExampleBot => MakeBot(new ExampleBot()),
-            };
+            } ;
         }
 
         int timeMS;

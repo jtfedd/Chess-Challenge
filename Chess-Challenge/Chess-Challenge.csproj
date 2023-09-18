@@ -33,6 +33,9 @@
     <Compile Update="src\My Bot\HeftyBot.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>
+    <Compile Update="src\My Bot\EvalV4.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Compile>
     <Compile Update="src\My Bot\TuningBot.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>

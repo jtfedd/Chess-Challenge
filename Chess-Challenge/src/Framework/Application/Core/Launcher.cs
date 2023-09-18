@@ -10,7 +10,6 @@ namespace ChessChallenge.Application
             printTokens();
             if (args[0] == "botmatch") BotMatch.BotMatchMain();
             if (args[0] == "program") Program.ProgramMain();
-            if (args[0] == "benchmark") Benchmarks.Benchmarks.Run();
             if (args[0] == "sandbox") testSearch();
             if (args[0] == "pvtables") PVTables.Run();
             if (args[0] == "tune") Tuning.Tuning.Run();
@@ -30,7 +29,7 @@ namespace ChessChallenge.Application
             Console.WriteLine(b.ZobristKey);
 
             var bot = new MyBot();
-            bot.benchmarkSearch(b, 7);
+            //bot.benchmarkSearch(b, 7);
 
             Console.WriteLine(DateTime.Now - now);
         }
@@ -39,8 +38,8 @@ namespace ChessChallenge.Application
         {
             var b = Board.CreateBoardFromFEN("8/p1p5/1kp1q3/8/pP4p1/2P5/1K1R4/3R4 w - - 0 1");
             var bot = new MyBot();
-            var eval = bot.testEval(b);
-            Console.WriteLine("eval: " + eval);
+            /*var eval = bot.testEval(b);
+            Console.WriteLine("eval: " + eval);*/
         }
     }
 }
