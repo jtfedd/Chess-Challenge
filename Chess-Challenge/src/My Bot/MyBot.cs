@@ -37,7 +37,6 @@ public class MyBot : IChessBot
         for (int i = 0; i < 224; i++) pieceSquareBonuses[i / 32, i % 8, i / 8 % 4] = (int)((packedPV[i / 8] >> (i % 8 * 8)) & 0x00000000000000FF) - 50;
     }
 
-
     int getPieceSquareBonus(int pieceType, int index, bool isWhite)
     {
         int rank = isWhite ? index / 8 : 7 - index / 8;
